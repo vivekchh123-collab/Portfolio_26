@@ -1,14 +1,12 @@
 "use client";
 
 import { useState, createContext, useContext } from "react";
-import { Inter, Great_Vibes } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 
 const inter = Inter({ subsets: ["latin"] });
-const signatureFont = Great_Vibes({ weight: "400", subsets: ["latin"] });
 
-// Context for editable homepage data
 interface ProfileContextType {
   name: string;
   setName: (v: string) => void;
@@ -34,7 +32,7 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [name, setName] = useState("Vivek");
+  const [name, setName] = useState("VIVEK");
   const [quote, setQuote] = useState("Full-Stack Developer & ECE Engineer");
   const [profileImg, setProfileImg] = useState(
     "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=1000&auto=format&fit=crop",
@@ -42,9 +40,9 @@ export default function RootLayout({
   const [signature, setSignature] = useState("Vivek Chaurasiya");
 
   return (
-    <html lang="en">
+    <html lang="en" className="bg-white dark:bg-slate-950 transition-colors">
       <body
-        className={`${inter.className} bg-[#f5f5f3] text-slate-900 min-h-screen flex flex-col`}
+        className={`${inter.className} bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 min-h-screen flex flex-col m-0 p-0`}
       >
         <ProfileContext.Provider
           value={{
@@ -58,10 +56,11 @@ export default function RootLayout({
             setSignature,
           }}
         >
-          <Navbar signatureFontClass={signatureFont.className} />
-          <main className="flex-1 max-w-7xl w-full mx-auto px-6 relative">
+          <Navbar />
+          {/* Main content wrapper */}
+          <div className="flex-1 w-full max-w-7xl mx-auto px-6 bg-transparent">
             {children}
-          </main>
+          </div>
         </ProfileContext.Provider>
       </body>
     </html>

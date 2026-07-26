@@ -1,61 +1,78 @@
-import Link from "next/link";
+"use client";
+
+import { ArrowDown } from "lucide-react";
+import { Great_Vibes, Oswald } from "next/font/google";
+import { useProfile } from "./layout";
+
+const signatureFont = Great_Vibes({
+  weight: "400",
+  subsets: ["latin"],
+  display: "swap",
+});
+
+const headlineFont = Oswald({
+  weight: ["700"],
+  subsets: ["latin"],
+  display: "swap",
+});
 
 export default function Home() {
-  return (
-    <div className="space-y-12">
-      {/* Hero Section */}
-      <section className="space-y-6 pt-6">
-        <span className="px-3 py-1 text-xs font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full">
-          Electronics & Communication Engineering
-        </span>
-        <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight">
-          Hi, I&apos;m <span className="text-indigo-400">Vivek Chaurasiya</span>
-          .
-        </h1>
-        <p className="text-lg text-slate-400 max-w-2xl leading-relaxed">
-          I build scalable web applications using full-stack technologies.
-          Focused on strong fundamentals in C, Node.js, React, Docker, and
-          database architecture.
-        </p>
-        <div className="flex gap-4 pt-2">
-          <Link
-            href="/projects"
-            className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg transition"
-          >
-            View Projects
-          </Link>
-          <Link
-            href="/resume"
-            className="px-6 py-3 border border-slate-700 hover:border-slate-500 text-slate-300 font-medium rounded-lg transition"
-          >
-            Check Resume
-          </Link>
-        </div>
-      </section>
+  const { name, quote, profileImg, signature } = useProfile();
 
-      {/* Tech Stack Section */}
-      <section className="space-y-4 pt-8 border-t border-slate-800">
-        <h2 className="text-xl font-bold text-slate-200">Primary Tech Stack</h2>
-        <div className="flex flex-wrap gap-3">
-          {[
-            "Next.js",
-            "React",
-            "Node.js",
-            "Express / Fastify",
-            "PostgreSQL",
-            "Prisma",
-            "Docker",
-            "C Programming",
-          ].map((tech) => (
-            <span
-              key={tech}
-              className="px-4 py-2 bg-slate-900 border border-slate-800 rounded-lg text-sm text-slate-300"
-            >
-              {tech}
-            </span>
-          ))}
+  return (
+    <main className="relative min-h-[calc(100vh-5rem)] flex flex-col justify-between py-8 text-black dark:text-white bg-white dark:bg-slate-950 transition-colors w-full">
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center flex-1">
+        {/* Left Side: FIXED "I AM" + DYNAMIC NAME */}
+        <section className="lg:col-span-7 space-y-6 z-10">
+          {/* Headline */}
+          <div
+            className={`space-y-0 leading-[0.85] tracking-tight uppercase ${headlineFont.className}`}
+          >
+            <h1 className="text-7xl sm:text-8xl md:text-[110px] font-bold text-black dark:text-white">
+              I AM
+            </h1>
+            <h2 className="text-7xl sm:text-8xl md:text-[110px] font-bold text-black dark:text-white break-words">
+              {name}
+            </h2>
+          </div>
+
+          {/* Tagline / Quote */}
+          <div className="pt-2">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-[2px] bg-black dark:bg-white" />
+              <p className="text-base sm:text-lg text-slate-700 dark:text-slate-300 font-normal">
+                 {quote}
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Right Side: Portrait Image */}
+        <section className="lg:col-span-5 flex justify-center lg:justify-end relative">
+          <div className="relative w-full max-w-md aspect-[4/5] overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+            <img
+              src={profileImg}
+              alt={name}
+              className="w-full h-full object-cover object-center grayscale hover:grayscale-0 transition duration-700 dark:mix-blend-normal mix-blend-multiply"
+            />
+          </div>
+        </section>
+      </div>
+
+      {/* Bottom Signature */}
+      <div className="flex justify-end pt-6">
+        <div className="text-right">
+          <span className="text-[10px] uppercase tracking-widest text-slate-400 dark:text-slate-500 block mb-1">
+            Verified Signature
+          </span>
+          <p
+            className={`text-4xl text-black dark:text-white select-none ${signatureFont.className}`}
+          >
+            {signature}
+          </p>
         </div>
-      </section>
-    </div>
+      </div>
+    </main>
   );
 }
