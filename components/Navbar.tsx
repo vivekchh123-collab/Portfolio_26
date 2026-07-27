@@ -3,24 +3,34 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Edit3, Sun, Moon, FileText } from "lucide-react";
+import { Edit3, Sun, Moon, FileText, ChevronDown } from "lucide-react";
 import HomeEditorModal from "./editor/HomeEditorModal";
 
 export default function Navbar() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
+  const [isProjectsDropdownOpen, setIsProjectsDropdownOpen] = useState(false);
   const [isHomeEditModalOpen, setIsHomeEditModalOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
+
   const menuRef = useRef<HTMLDivElement>(null);
+  const projectsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     document.documentElement.classList.add("dark");
   }, []);
 
+  // Close menus on click outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setIsOpen(false);
+      }
+      if (
+        projectsRef.current &&
+        !projectsRef.current.contains(event.target as Node)
+      ) {
+        setIsProjectsDropdownOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -40,7 +50,6 @@ export default function Navbar() {
   const handleEditClick = () => {
     setIsOpen(false);
     if (pathname === "/resume") {
-      // Dispatches custom browser event to open resume editor
       window.dispatchEvent(new CustomEvent("open-resume-editor"));
     } else {
       setIsHomeEditModalOpen(true);
@@ -117,19 +126,89 @@ export default function Navbar() {
           </div>
 
           {/* Navigation Links */}
-          <div className="flex gap-8 font-medium text-slate-600 dark:text-slate-300 text-sm tracking-wide">
+          <div className="flex gap-8 items-center font-medium text-slate-600 dark:text-slate-300 text-sm tracking-wide">
             <Link
               href="/"
               className="hover:text-black dark:hover:text-white transition"
             >
               About Me
             </Link>
-            <Link
-              href="/projects"
-              className="hover:text-black dark:hover:text-white transition"
-            >
-              Project
-            </Link>
+
+            {/* PROJECT LINK + DROPDOWN ARROW */}
+            <div className="relative flex items-center" ref={projectsRef}>
+              {/* Direct Link to Projects Page */}
+              <Link
+                href="/projects"
+                className="hover:text-black dark:hover:text-white transition py-2"
+              >
+                Project
+              </Link>
+
+              {/* Small Dropdown Arrow Button */}
+              <button
+                onClick={() =>
+                  setIsProjectsDropdownOpen(!isProjectsDropdownOpen)
+                }
+                className="p-1 hover:text-black dark:hover:text-white transition focus:outline-none cursor-pointer ml-0.5"
+                aria-label="Toggle Project Links"
+              >
+                <ChevronDown
+                  size={14}
+                  className={`transition-transform duration-200 ${
+                    isProjectsDropdownOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+
+              {/* Dropdown Menu (Only GitHub and LeetCode) */}
+              {isProjectsDropdownOpen && (
+                <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl py-2 z-50">
+                  {/* GitHub Link */}
+                  <a
+                    href="https://github.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => setIsProjectsDropdownOpen(false)}
+                    className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                  >
+                    <div className="w-5 h-5 flex items-center justify-center rounded-full bg-black dark:bg-white text-white dark:text-black p-0.5">
+                      <svg
+                        viewBox="0 0 24 24"
+                        className="w-full h-full fill-current"
+                      >
+                        <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+                      </svg>
+                    </div>
+                    <span>GitHub</span>
+                  </a>
+
+                  {/* LeetCode Link */}
+                  <a
+                    href="https://leetcode.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => setIsProjectsDropdownOpen(false)}
+                    className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                  >
+                    <div className="w-5 h-5 flex items-center justify-center">
+                      <svg viewBox="0 0 24 24" className="w-full h-full">
+                        <path
+                          fill="#FFA116"
+                          d="M16.102 17.93l-2.697 2.607c-.466.451-1.211.451-1.677 0l-7.231-6.992a3.864 3.864 0 010-5.462l7.23-6.992c.466-.451 1.212-.451 1.678 0l2.697 2.607a1.189 1.189 0 010 1.681l-4.717 4.561a1.189 1.189 0 000 1.681l4.717 4.561a1.189 1.189 0 010 1.681z"
+                        />
+                        <path
+                          fill="#282828"
+                          className="dark:fill-white transition"
+                          d="M10.887 12.841h9.113c.656 0 1.188-.532 1.188-1.188s-.532-1.188-1.188-1.188h-9.113c-.656 0-1.188.532-1.188 1.188s.532 1.188 1.188 1.188z"
+                        />
+                      </svg>
+                    </div>
+                    <span>LeetCode</span>
+                  </a>
+                </div>
+              )}
+            </div>
+
             <Link
               href="/resume"
               className="hover:text-black dark:hover:text-white transition"
