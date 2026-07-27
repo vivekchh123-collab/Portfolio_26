@@ -40,7 +40,7 @@ export default function RootLayout({
   const [signature, setSignature] = useState("Vivek Chaurasiya");
 
   return (
-    <html lang="en" className="bg-white dark:bg-slate-950 transition-colors">
+    <html lang="en" className="dark bg-slate-950 transition-colors">
       <body
         className={`${inter.className} bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 min-h-screen flex flex-col m-0 p-0`}
       >
