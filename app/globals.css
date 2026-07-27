@@ -38,3 +38,46 @@ body {
 body {
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
+/* Clean Print Layout: Shows ONLY the resume card */
+@media print {
+  /* Hide navbar, action buttons, headers, and backgrounds */
+  nav,
+  header,
+  footer,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* Reset body margins and background for printing */
+  html,
+  body {
+    background: white !important;
+    background-color: white !important;
+    color: black !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    overflow: visible !important;
+  }
+
+  /* Target main container on resume page */
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    min-height: auto !important;
+    width: 100% !important;
+  }
+
+  /* Expand resume card to fit exact A4 page */
+  .printable-resume {
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    page-break-inside: avoid;
+  }
+}

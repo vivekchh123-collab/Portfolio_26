@@ -123,7 +123,7 @@ export default function ResumePage() {
       </div>
 
       {/* Main Resume Card Frame */}
-      <div className="relative w-full max-w-4xl bg-white text-slate-800 rounded-3xl shadow-2xl overflow-hidden border border-slate-200">
+      <div className="printable-resume relative w-full max-w-4xl bg-white text-slate-800 rounded-3xl shadow-2xl overflow-hidden border border-slate-200">
         {/* BLUR OVERLAY FOR PASSWORD PROTECTION */}
         {!isAuthenticated && (
           <div className="absolute inset-0 z-30 bg-slate-950/40 backdrop-blur-md flex items-center justify-center p-6 print:hidden">

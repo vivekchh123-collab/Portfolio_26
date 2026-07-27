@@ -1,9 +1,9 @@
 "use client";
 
-import { X, Upload, Key } from "lucide-react";
+import { X, Upload, Key, Plus, Trash2 } from "lucide-react";
 
 export interface ResumeData {
-  password: string; // <-- Added password property
+  password: string;
   name: string;
   role: string;
   aboutMe: string;
@@ -38,6 +38,7 @@ export default function ResumeEditorModal({
 }: ResumeEditorModalProps) {
   if (!isOpen) return null;
 
+  // Image Upload Handler
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -54,17 +55,79 @@ export default function ResumeEditorModal({
     }
   };
 
+  // --- Work Experience Handlers ---
+  const handleWorkChange = (index: number, field: string, value: string) => {
+    const updated = [...resumeData.workExperience];
+    updated[index] = { ...updated[index], [field]: value };
+    setResumeData({ ...resumeData, workExperience: updated });
+  };
+
+  const addWorkExperience = () => {
+    setResumeData({
+      ...resumeData,
+      workExperience: [
+        ...resumeData.workExperience,
+        {
+          title: "JOB TITLE",
+          company: "Company Name",
+          period: "2024 - Present",
+          desc: "Description here...",
+        },
+      ],
+    });
+  };
+
+  const removeWorkExperience = (index: number) => {
+    setResumeData({
+      ...resumeData,
+      workExperience: resumeData.workExperience.filter((_, i) => i !== index),
+    });
+  };
+
+  // --- Education Handlers ---
+  const handleEducationChange = (
+    index: number,
+    field: string,
+    value: string,
+  ) => {
+    const updated = [...resumeData.education];
+    updated[index] = { ...updated[index], [field]: value };
+    setResumeData({ ...resumeData, education: updated });
+  };
+
+  const addEducation = () => {
+    setResumeData({
+      ...resumeData,
+      education: [
+        ...resumeData.education,
+        {
+          degree: "DEGREE / DIPLOMA",
+          school: "University / Institute",
+          period: "2020 - 2024",
+        },
+      ],
+    });
+  };
+
+  const removeEducation = (index: number) => {
+    setResumeData({
+      ...resumeData,
+      education: resumeData.education.filter((_, i) => i !== index),
+    });
+  };
+
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 w-full max-w-2xl max-h-[85vh] overflow-y-auto space-y-4 shadow-2xl relative text-slate-900 dark:text-slate-100">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 pt-24">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 w-full max-w-3xl max-h-[85vh] overflow-y-auto space-y-6 shadow-2xl relative text-slate-900 dark:text-slate-100">
+        {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-slate-400 hover:text-black dark:hover:text-white"
+          className="absolute top-4 right-4 p-2 rounded-lg text-slate-400 hover:text-black dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer z-10"
         >
           <X size={20} />
         </button>
 
-        <h2 className="text-xl font-bold border-b border-slate-200 dark:border-slate-800 pb-2">
+        <h2 className="text-xl font-bold border-b border-slate-200 dark:border-slate-800 pb-2 pr-8">
           Edit Resume Content
         </h2>
 
@@ -82,11 +145,9 @@ export default function ResumeEditorModal({
             placeholder="Set password to unlock resume"
             className="w-full p-2 border rounded-lg text-sm bg-white dark:bg-slate-800 border-indigo-200 dark:border-indigo-800 text-slate-900 dark:text-white focus:outline-indigo-600 font-mono"
           />
-          <p className="text-[10px] text-indigo-600/80 dark:text-indigo-400/80 mt-1">
-            This is the password visitors must enter to unblur your resume.
-          </p>
         </div>
 
+        {/* Personal & Basic Details */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">
@@ -247,9 +308,170 @@ export default function ResumeEditorModal({
           </div>
         </div>
 
+        {/* WORK EXPERIENCE SECTION */}
+        <div className="space-y-4 border-t border-slate-200 dark:border-slate-800 pt-4">
+          <div className="flex justify-between items-center">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+              Work Experience
+            </h3>
+            <button
+              type="button"
+              onClick={addWorkExperience}
+              className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 font-medium hover:bg-indigo-100 transition cursor-pointer"
+            >
+              <Plus size={14} /> Add Experience
+            </button>
+          </div>
+
+          {resumeData.workExperience.map((item, index) => (
+            <div
+              key={index}
+              className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 space-y-3 relative"
+            >
+              <button
+                type="button"
+                onClick={() => removeWorkExperience(index)}
+                className="absolute top-3 right-3 text-slate-400 hover:text-rose-500 transition cursor-pointer"
+              >
+                <Trash2 size={16} />
+              </button>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pr-6">
+                <div>
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase">
+                    Job Title
+                  </label>
+                  <input
+                    type="text"
+                    value={item.title}
+                    onChange={(e) =>
+                      handleWorkChange(index, "title", e.target.value)
+                    }
+                    className="w-full mt-0.5 p-2 border rounded-lg text-xs bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase">
+                    Company
+                  </label>
+                  <input
+                    type="text"
+                    value={item.company}
+                    onChange={(e) =>
+                      handleWorkChange(index, "company", e.target.value)
+                    }
+                    className="w-full mt-0.5 p-2 border rounded-lg text-xs bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase">
+                    Period / Dates
+                  </label>
+                  <input
+                    type="text"
+                    value={item.period}
+                    onChange={(e) =>
+                      handleWorkChange(index, "period", e.target.value)
+                    }
+                    className="w-full mt-0.5 p-2 border rounded-lg text-xs bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-semibold text-slate-400 uppercase">
+                  Description
+                </label>
+                <textarea
+                  rows={2}
+                  value={item.desc}
+                  onChange={(e) =>
+                    handleWorkChange(index, "desc", e.target.value)
+                  }
+                  className="w-full mt-0.5 p-2 border rounded-lg text-xs bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700"
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* EDUCATION SECTION */}
+        <div className="space-y-4 border-t border-slate-200 dark:border-slate-800 pt-4">
+          <div className="flex justify-between items-center">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+              Education
+            </h3>
+            <button
+              type="button"
+              onClick={addEducation}
+              className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 font-medium hover:bg-indigo-100 transition cursor-pointer"
+            >
+              <Plus size={14} /> Add Education
+            </button>
+          </div>
+
+          {resumeData.education.map((item, index) => (
+            <div
+              key={index}
+              className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 space-y-3 relative"
+            >
+              <button
+                type="button"
+                onClick={() => removeEducation(index)}
+                className="absolute top-3 right-3 text-slate-400 hover:text-rose-500 transition cursor-pointer"
+              >
+                <Trash2 size={16} />
+              </button>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pr-6">
+                <div>
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase">
+                    Degree / Course
+                  </label>
+                  <input
+                    type="text"
+                    value={item.degree}
+                    onChange={(e) =>
+                      handleEducationChange(index, "degree", e.target.value)
+                    }
+                    className="w-full mt-0.5 p-2 border rounded-lg text-xs bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase">
+                    School / University
+                  </label>
+                  <input
+                    type="text"
+                    value={item.school}
+                    onChange={(e) =>
+                      handleEducationChange(index, "school", e.target.value)
+                    }
+                    className="w-full mt-0.5 p-2 border rounded-lg text-xs bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase">
+                    Period / Years
+                  </label>
+                  <input
+                    type="text"
+                    value={item.period}
+                    onChange={(e) =>
+                      handleEducationChange(index, "period", e.target.value)
+                    }
+                    className="w-full mt-0.5 p-2 border rounded-lg text-xs bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700"
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Save Button */}
         <button
           onClick={onClose}
-          className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg text-sm transition mt-2"
+          className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg text-sm transition mt-4 cursor-pointer"
         >
           Save Resume Changes
         </button>
