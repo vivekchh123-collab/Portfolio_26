@@ -3,15 +3,27 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Edit3, Sun, Moon, FileText, ChevronDown } from "lucide-react";
+import { Edit3, Sun, Moon, FileText, ChevronDown, Code2 } from "lucide-react";
 import HomeEditorModal from "./editor/HomeEditorModal";
+import ProjectsEditorModal from "./editor/ProjectsEditorModal";
 
 export default function Navbar() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [isProjectsDropdownOpen, setIsProjectsDropdownOpen] = useState(false);
+
+  // Editor Modal States
   const [isHomeEditModalOpen, setIsHomeEditModalOpen] = useState(false);
+  const [isProjectsEditModalOpen, setIsProjectsEditModalOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
+
+  // Dynamic Profile URLs
+  const [githubUrl, setGithubUrl] = useState(
+    "https://github.com/vivekchh123-collab",
+  );
+  const [leetcodeUrl, setLeetcodeUrl] = useState(
+    "https://leetcode.com/u/vivek_chaurasiya_14/",
+  );
 
   const menuRef = useRef<HTMLDivElement>(null);
   const projectsRef = useRef<HTMLDivElement>(null);
@@ -20,7 +32,6 @@ export default function Navbar() {
     document.documentElement.classList.add("dark");
   }, []);
 
-  // Close menus on click outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -51,6 +62,8 @@ export default function Navbar() {
     setIsOpen(false);
     if (pathname === "/resume") {
       window.dispatchEvent(new CustomEvent("open-resume-editor"));
+    } else if (pathname === "/projects") {
+      setIsProjectsEditModalOpen(true);
     } else {
       setIsHomeEditModalOpen(true);
     }
@@ -80,7 +93,6 @@ export default function Navbar() {
 
             {isOpen && (
               <div className="absolute left-0 mt-2 w-60 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl py-2 z-50">
-                {/* Theme Toggle */}
                 <button
                   onClick={toggleDarkMode}
                   className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition text-left cursor-pointer"
@@ -97,7 +109,7 @@ export default function Navbar() {
 
                 <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
 
-                {/* Dynamic Editor Trigger */}
+                {/* Route-Based Dynamic Editor Option */}
                 {pathname === "/resume" ? (
                   <button
                     onClick={handleEditClick}
@@ -108,6 +120,17 @@ export default function Navbar() {
                       className="text-indigo-600 dark:text-indigo-400"
                     />
                     Edit Resume Content
+                  </button>
+                ) : pathname === "/projects" ? (
+                  <button
+                    onClick={handleEditClick}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition text-left cursor-pointer"
+                  >
+                    <Code2
+                      size={16}
+                      className="text-indigo-600 dark:text-indigo-400"
+                    />
+                    Edit Developer Links
                   </button>
                 ) : (
                   <button
@@ -136,7 +159,6 @@ export default function Navbar() {
 
             {/* PROJECT LINK + DROPDOWN ARROW */}
             <div className="relative flex items-center" ref={projectsRef}>
-              {/* Direct Link to Projects Page */}
               <Link
                 href="/projects"
                 className="hover:text-black dark:hover:text-white transition py-2"
@@ -144,28 +166,23 @@ export default function Navbar() {
                 Project
               </Link>
 
-              {/* Small Dropdown Arrow Button */}
               <button
                 onClick={() =>
                   setIsProjectsDropdownOpen(!isProjectsDropdownOpen)
                 }
                 className="p-1 hover:text-black dark:hover:text-white transition focus:outline-none cursor-pointer ml-0.5"
-                aria-label="Toggle Project Links"
               >
                 <ChevronDown
                   size={14}
-                  className={`transition-transform duration-200 ${
-                    isProjectsDropdownOpen ? "rotate-180" : ""
-                  }`}
+                  className={`transition-transform duration-200 ${isProjectsDropdownOpen ? "rotate-180" : ""}`}
                 />
               </button>
 
-              {/* Dropdown Menu (Only GitHub and LeetCode) */}
+              {/* Dynamic Links */}
               {isProjectsDropdownOpen && (
                 <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl py-2 z-50">
-                  {/* GitHub Link */}
                   <a
-                    href="https://github.com"
+                    href={githubUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={() => setIsProjectsDropdownOpen(false)}
@@ -182,9 +199,8 @@ export default function Navbar() {
                     <span>GitHub</span>
                   </a>
 
-                  {/* LeetCode Link */}
                   <a
-                    href="https://leetcode.com"
+                    href={leetcodeUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={() => setIsProjectsDropdownOpen(false)}
@@ -219,10 +235,19 @@ export default function Navbar() {
         </div>
       </nav>
 
-      {/* Render Isolated Homepage Editor Component */}
+      {/* Editor Components */}
       <HomeEditorModal
         isOpen={isHomeEditModalOpen}
         onClose={() => setIsHomeEditModalOpen(false)}
+      />
+
+      <ProjectsEditorModal
+        isOpen={isProjectsEditModalOpen}
+        onClose={() => setIsProjectsEditModalOpen(false)}
+        githubUrl={githubUrl}
+        setGithubUrl={setGithubUrl}
+        leetcodeUrl={leetcodeUrl}
+        setLeetcodeUrl={setLeetcodeUrl}
       />
     </>
   );
