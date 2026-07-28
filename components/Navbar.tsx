@@ -3,9 +3,20 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Edit3, Sun, Moon, FileText, ChevronDown, Code2 } from "lucide-react";
+import {
+  Edit3,
+  Sun,
+  Moon,
+  FileText,
+  ChevronDown,
+  Code2,
+  Layers,
+} from "lucide-react";
 import HomeEditorModal from "./editor/HomeEditorModal";
 import ProjectsEditorModal from "./editor/ProjectsEditorModal";
+import AppShowcaseEditorModal, {
+  ProjectItem,
+} from "./editor/AppShowcaseEditorModal";
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -15,6 +26,7 @@ export default function Navbar() {
   // Editor Modal States
   const [isHomeEditModalOpen, setIsHomeEditModalOpen] = useState(false);
   const [isProjectsEditModalOpen, setIsProjectsEditModalOpen] = useState(false);
+  const [isAppShowcaseModalOpen, setIsAppShowcaseModalOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
 
   // Dynamic Profile URLs
@@ -24,6 +36,19 @@ export default function Navbar() {
   const [leetcodeUrl, setLeetcodeUrl] = useState(
     "https://leetcode.com/u/vivek_chaurasiya_14/",
   );
+
+  // Dynamic Projects State
+  const [projects, setProjects] = useState<ProjectItem[]>([
+    {
+      id: "1",
+      name: "Personal Performance Tracker",
+      description:
+        "Habit tracking and data visualization app analyzing daily routines and productivity trends.",
+      appUrl: "https://tracker-pro.example.com",
+      techStack: ["Next.js", "Node.js", "Prisma", "PostgreSQL"],
+      images: [],
+    },
+  ]);
 
   const menuRef = useRef<HTMLDivElement>(null);
   const projectsRef = useRef<HTMLDivElement>(null);
@@ -58,17 +83,6 @@ export default function Navbar() {
     }
   };
 
-  const handleEditClick = () => {
-    setIsOpen(false);
-    if (pathname === "/resume") {
-      window.dispatchEvent(new CustomEvent("open-resume-editor"));
-    } else if (pathname === "/projects") {
-      setIsProjectsEditModalOpen(true);
-    } else {
-      setIsHomeEditModalOpen(true);
-    }
-  };
-
   return (
     <>
       <nav className="fixed top-0 left-0 right-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 transition-colors">
@@ -91,28 +105,17 @@ export default function Navbar() {
               </svg>
             </button>
 
+            {/* V Logo Editor Options Only */}
             {isOpen && (
-              <div className="absolute left-0 mt-2 w-60 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl py-2 z-50">
-                <button
-                  onClick={toggleDarkMode}
-                  className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition text-left cursor-pointer"
-                >
-                  <span className="flex items-center gap-2">
-                    {isDarkMode ? (
-                      <Sun size={16} className="text-amber-400" />
-                    ) : (
-                      <Moon size={16} className="text-indigo-600" />
-                    )}
-                    {isDarkMode ? "Light Mode" : "Dark Mode"}
-                  </span>
-                </button>
-
-                <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
-
-                {/* Route-Based Dynamic Editor Option */}
+              <div className="absolute left-0 mt-2 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl py-2 z-50">
                 {pathname === "/resume" ? (
                   <button
-                    onClick={handleEditClick}
+                    onClick={() => {
+                      setIsOpen(false);
+                      window.dispatchEvent(
+                        new CustomEvent("open-resume-editor"),
+                      );
+                    }}
                     className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition text-left cursor-pointer"
                   >
                     <FileText
@@ -122,19 +125,40 @@ export default function Navbar() {
                     Edit Resume Content
                   </button>
                 ) : pathname === "/projects" ? (
-                  <button
-                    onClick={handleEditClick}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition text-left cursor-pointer"
-                  >
-                    <Code2
-                      size={16}
-                      className="text-indigo-600 dark:text-indigo-400"
-                    />
-                    Edit Developer Links
-                  </button>
+                  <>
+                    <button
+                      onClick={() => {
+                        setIsOpen(false);
+                        setIsAppShowcaseModalOpen(true);
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition text-left cursor-pointer"
+                    >
+                      <Layers
+                        size={16}
+                        className="text-indigo-600 dark:text-indigo-400"
+                      />
+                      Edit Projects Showcase
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsOpen(false);
+                        setIsProjectsEditModalOpen(true);
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition text-left cursor-pointer"
+                    >
+                      <Code2
+                        size={16}
+                        className="text-indigo-600 dark:text-indigo-400"
+                      />
+                      Edit Developer Links
+                    </button>
+                  </>
                 ) : (
                   <button
-                    onClick={handleEditClick}
+                    onClick={() => {
+                      setIsOpen(false);
+                      setIsHomeEditModalOpen(true);
+                    }}
                     className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition text-left cursor-pointer"
                   >
                     <Edit3
@@ -148,7 +172,7 @@ export default function Navbar() {
             )}
           </div>
 
-          {/* Navigation Links */}
+          {/* Top Right Navigation Links + Dark Mode Toggle */}
           <div className="flex gap-8 items-center font-medium text-slate-600 dark:text-slate-300 text-sm tracking-wide">
             <Link
               href="/"
@@ -178,7 +202,7 @@ export default function Navbar() {
                 />
               </button>
 
-              {/* Dynamic Links */}
+              {/* GitHub & LeetCode Menu */}
               {isProjectsDropdownOpen && (
                 <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl py-2 z-50">
                   <a
@@ -231,6 +255,21 @@ export default function Navbar() {
             >
               Resume
             </Link>
+
+            {/* TOP RIGHT DARK MODE TOGGLE BUTTON */}
+            <button
+              onClick={toggleDarkMode}
+              className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 transition text-slate-700 dark:text-slate-200 cursor-pointer"
+              title={
+                isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"
+              }
+            >
+              {isDarkMode ? (
+                <Sun size={18} className="text-amber-400" />
+              ) : (
+                <Moon size={18} className="text-indigo-600" />
+              )}
+            </button>
           </div>
         </div>
       </nav>
@@ -248,6 +287,13 @@ export default function Navbar() {
         setGithubUrl={setGithubUrl}
         leetcodeUrl={leetcodeUrl}
         setLeetcodeUrl={setLeetcodeUrl}
+      />
+
+      <AppShowcaseEditorModal
+        isOpen={isAppShowcaseModalOpen}
+        onClose={() => setIsAppShowcaseModalOpen(false)}
+        projects={projects}
+        setProjects={setProjects}
       />
     </>
   );
