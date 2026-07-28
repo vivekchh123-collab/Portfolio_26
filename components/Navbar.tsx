@@ -38,7 +38,7 @@ export default function Navbar() {
   );
 
   // Dynamic Projects State
-  const [projects, setProjects] = useState<ProjectItem[]>([
+  const defaultProjects: ProjectItem[] = [
     {
       id: "1",
       name: "Personal Performance Tracker",
@@ -48,13 +48,36 @@ export default function Navbar() {
       techStack: ["Next.js", "Node.js", "Prisma", "PostgreSQL"],
       images: [],
     },
-  ]);
+  ];
+
+  const [projects, setProjects] = useState<ProjectItem[]>(defaultProjects);
 
   const menuRef = useRef<HTMLDivElement>(null);
   const projectsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     document.documentElement.classList.add("dark");
+  }, []);
+
+  // Load and sync projects from localStorage
+  useEffect(() => {
+    const loadProjects = () => {
+      const saved = localStorage.getItem("user_projects_data");
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setProjects(parsed);
+          }
+        } catch (e) {
+          console.error("Failed to parse projects in Navbar", e);
+        }
+      }
+    };
+
+    loadProjects();
+    window.addEventListener("projects-updated", loadProjects);
+    return () => window.removeEventListener("projects-updated", loadProjects);
   }, []);
 
   useEffect(() => {
@@ -105,7 +128,7 @@ export default function Navbar() {
               </svg>
             </button>
 
-            {/* V Logo Editor Options Only */}
+            {/* V Logo Editor Options */}
             {isOpen && (
               <div className="absolute left-0 mt-2 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl py-2 z-50">
                 {pathname === "/resume" ? (
@@ -172,7 +195,7 @@ export default function Navbar() {
             )}
           </div>
 
-          {/* Top Right Navigation Links + Dark Mode Toggle */}
+          {/* Top Right Navigation Links + Dark Mode Button */}
           <div className="flex gap-8 items-center font-medium text-slate-600 dark:text-slate-300 text-sm tracking-wide">
             <Link
               href="/"
@@ -256,7 +279,7 @@ export default function Navbar() {
               Resume
             </Link>
 
-            {/* TOP RIGHT DARK MODE TOGGLE BUTTON */}
+            {/* TOP RIGHT DARK MODE BUTTON */}
             <button
               onClick={toggleDarkMode}
               className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 transition text-slate-700 dark:text-slate-200 cursor-pointer"

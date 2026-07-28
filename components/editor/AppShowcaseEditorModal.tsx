@@ -40,6 +40,7 @@ export default function AppShowcaseEditorModal({
   const [localProjects, setLocalProjects] =
     useState<ProjectItem[]>(defaultProjects);
 
+  // Sync projects with localStorage on mount/open
   useEffect(() => {
     if (isOpen) {
       const saved = localStorage.getItem("user_projects_data");
@@ -48,25 +49,25 @@ export default function AppShowcaseEditorModal({
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed) && parsed.length > 0) {
             setLocalProjects(parsed);
+            return;
           }
         } catch (e) {
           console.error("Failed to parse projects from localStorage", e);
         }
-      } else if (externalProjects && externalProjects.length > 0) {
+      }
+      if (externalProjects && externalProjects.length > 0) {
         setLocalProjects(externalProjects);
       }
     }
-  }, [isOpen, externalProjects]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
-  const currentProjects = externalProjects || localProjects;
-
   const updateProjectsState = (updatedList: ProjectItem[]) => {
+    setLocalProjects(updatedList);
     if (externalSetProjects) {
       externalSetProjects(updatedList);
     }
-    setLocalProjects(updatedList);
   };
 
   const handleAddProject = () => {
@@ -78,11 +79,13 @@ export default function AppShowcaseEditorModal({
       techStack: ["Next.js", "Node.js", "Prisma", "PostgreSQL"],
       images: [],
     };
-    updateProjectsState([...currentProjects, newProject]);
+    const updated = [...localProjects, newProject];
+    updateProjectsState(updated);
   };
 
   const handleRemoveProject = (id: string) => {
-    updateProjectsState(currentProjects.filter((p) => p.id !== id));
+    const updated = localProjects.filter((p) => p.id !== id);
+    updateProjectsState(updated);
   };
 
   const handleProjectChange = (
@@ -90,13 +93,12 @@ export default function AppShowcaseEditorModal({
     field: keyof ProjectItem,
     value: any,
   ) => {
-    const updated = currentProjects.map((p) =>
+    const updated = localProjects.map((p) =>
       p.id === id ? { ...p, [field]: value } : p,
     );
     updateProjectsState(updated);
   };
 
-  // Upload multiple new images
   const handleImageUpload = (
     id: string,
     e: React.ChangeEvent<HTMLInputElement>,
@@ -120,7 +122,7 @@ export default function AppShowcaseEditorModal({
         if (typeof reader.result === "string") {
           loadedImages.push(reader.result);
           if (loadedImages.length === fileList.length) {
-            const project = currentProjects.find((p) => p.id === id);
+            const project = localProjects.find((p) => p.id === id);
             if (project) {
               handleProjectChange(id, "images", [
                 ...project.images,
@@ -134,7 +136,6 @@ export default function AppShowcaseEditorModal({
     });
   };
 
-  // Replace a specific single image
   const handleReplaceImage = (
     projectId: string,
     imageIndex: number,
@@ -151,7 +152,7 @@ export default function AppShowcaseEditorModal({
     const reader = new FileReader();
     reader.onloadend = () => {
       if (typeof reader.result === "string") {
-        const project = currentProjects.find((p) => p.id === projectId);
+        const project = localProjects.find((p) => p.id === projectId);
         if (project) {
           const updatedImages = [...project.images];
           updatedImages[imageIndex] = reader.result;
@@ -162,9 +163,8 @@ export default function AppShowcaseEditorModal({
     reader.readAsDataURL(file);
   };
 
-  // Delete a specific image
   const handleRemoveImage = (projectId: string, imageIndex: number) => {
-    const project = currentProjects.find((p) => p.id === projectId);
+    const project = localProjects.find((p) => p.id === projectId);
     if (project) {
       const updatedImages = project.images.filter(
         (_, idx) => idx !== imageIndex,
@@ -175,10 +175,7 @@ export default function AppShowcaseEditorModal({
 
   const handleSave = () => {
     try {
-      localStorage.setItem(
-        "user_projects_data",
-        JSON.stringify(currentProjects),
-      );
+      localStorage.setItem("user_projects_data", JSON.stringify(localProjects));
       window.dispatchEvent(new Event("projects-updated"));
     } catch (error) {
       console.error("Storage Error:", error);
@@ -200,14 +197,14 @@ export default function AppShowcaseEditorModal({
 
         <h2 className="text-xl font-bold border-b border-slate-200 dark:border-slate-800 pb-3 flex items-center gap-2">
           <Layers size={22} className="text-indigo-600 dark:text-indigo-400" />
-          Edit Applications & Images
+          Edit Applications & Showcase Images
         </h2>
 
         {/* PROJECTS LIST */}
         <div className="space-y-6">
           <div className="flex justify-between items-center">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              Applications List
+              Applications List ({localProjects.length})
             </h3>
             <button
               onClick={handleAddProject}
@@ -217,7 +214,7 @@ export default function AppShowcaseEditorModal({
             </button>
           </div>
 
-          {currentProjects.map((project) => (
+          {localProjects.map((project) => (
             <div
               key={project.id}
               className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 space-y-4 relative"
@@ -226,6 +223,7 @@ export default function AppShowcaseEditorModal({
                 type="button"
                 onClick={() => handleRemoveProject(project.id)}
                 className="absolute top-4 right-4 text-slate-400 hover:text-rose-500 transition cursor-pointer"
+                title="Remove Project"
               >
                 <Trash2 size={16} />
               </button>
@@ -261,10 +259,10 @@ export default function AppShowcaseEditorModal({
                 </div>
               </div>
 
-              {/* Image Uploader & Replacer */}
+              {/* Image Upload Field */}
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-slate-400 uppercase">
-                  Project Images ({project.images.length} uploaded)
+                  Project Screenshots ({project.images.length})
                 </label>
 
                 <div className="flex flex-wrap gap-3 items-center">
@@ -282,7 +280,7 @@ export default function AppShowcaseEditorModal({
                     />
                   </label>
 
-                  {/* Uploaded Image Previews with Change/Swap Buttons */}
+                  {/* Image Thumbnails with Swap / Delete */}
                   {project.images.map((img, idx) => (
                     <div
                       key={idx}
@@ -294,9 +292,7 @@ export default function AppShowcaseEditorModal({
                         className="w-full h-full object-cover"
                       />
 
-                      {/* Action buttons on hover */}
                       <div className="absolute inset-0 bg-black/70 text-white flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition">
-                        {/* Replace image button */}
                         <label
                           className="p-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 cursor-pointer transition"
                           title="Swap Image"
@@ -312,7 +308,6 @@ export default function AppShowcaseEditorModal({
                           />
                         </label>
 
-                        {/* Delete image button */}
                         <button
                           type="button"
                           onClick={() => handleRemoveImage(project.id, idx)}

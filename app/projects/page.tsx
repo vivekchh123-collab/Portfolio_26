@@ -12,7 +12,6 @@ import {
   X,
   Maximize2,
   Check,
-  Circle,
 } from "lucide-react";
 import { ProjectItem } from "@/components/editor/AppShowcaseEditorModal";
 
@@ -43,7 +42,8 @@ export default function ProjectsPage() {
     [key: string]: number;
   }>({});
 
-  // Interactive Stats States
+  // Interactive Stats States (Starts at 0)
+  const [viewCounts, setViewCounts] = useState<{ [key: string]: number }>({});
   const [likedProjects, setLikedProjects] = useState<{
     [key: string]: boolean;
   }>({});
@@ -99,12 +99,20 @@ export default function ProjectsPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [lightboxState]);
 
+  const incrementViews = (projectId: string) => {
+    setViewCounts((prev) => ({
+      ...prev,
+      [projectId]: (prev[projectId] || 0) + 1,
+    }));
+  };
+
   const handleNextImage = (
     projectId: string,
     totalImages: number,
     e: React.MouseEvent,
   ) => {
     e.stopPropagation();
+    incrementViews(projectId);
     setActiveImageIndices((prev) => ({
       ...prev,
       [projectId]: ((prev[projectId] || 0) + 1) % totalImages,
@@ -117,6 +125,7 @@ export default function ProjectsPage() {
     e: React.MouseEvent,
   ) => {
     e.stopPropagation();
+    incrementViews(projectId);
     setActiveImageIndices((prev) => ({
       ...prev,
       [projectId]:
@@ -163,7 +172,6 @@ export default function ProjectsPage() {
     }));
   };
 
-  // Share Application Link to Clipboard
   const handleShare = (project: ProjectItem) => {
     const linkToShare = project.appUrl || window.location.href;
     navigator.clipboard.writeText(linkToShare);
@@ -177,7 +185,6 @@ export default function ProjectsPage() {
     setTimeout(() => setCopiedAppId(null), 2500);
   };
 
-  // Add Comment
   const handleAddComment = (projectId: string) => {
     const text = newCommentText[projectId]?.trim();
     if (!text) return;
@@ -199,7 +206,6 @@ export default function ProjectsPage() {
     setNewCommentText((prev) => ({ ...prev, [projectId]: "" }));
   };
 
-  // Like Individual Comment
   const toggleCommentLike = (projectId: string, commentId: string) => {
     setCommentsMap((prev) => {
       const currentComments = prev[projectId] || [];
@@ -239,13 +245,18 @@ export default function ProjectsPage() {
             const comments = commentsMap[project.id] || [];
             const isCommentOpen = openCommentAppId === project.id;
             const shares = shareCounts[project.id] || 0;
+            const views = viewCounts[project.id] || 0;
+
+            // Only show the stats bar if at least one interaction has occurred
+            const hasInteracted =
+              views > 0 || isLiked || comments.length > 0 || shares > 0;
 
             return (
               <div
                 key={project.id}
                 className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-[#262626] rounded-3xl shadow-xl overflow-hidden transition-colors relative"
               >
-                {/* --- 1. HEADER (Application Name + Live Working Status) --- */}
+                {/* --- 1. HEADER --- */}
                 <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-[#262626]">
                   <div>
                     <div className="flex items-center gap-2">
@@ -253,7 +264,6 @@ export default function ProjectsPage() {
                         {project.name}
                       </h3>
 
-                      {/* Working Status Indicator */}
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                         Working
@@ -265,7 +275,6 @@ export default function ProjectsPage() {
                     </span>
                   </div>
 
-                  {/* "Visit app" button */}
                   {project.appUrl && (
                     <a
                       href={project.appUrl}
@@ -278,12 +287,17 @@ export default function ProjectsPage() {
                   )}
                 </div>
 
-                {/* --- 2. INSTAGRAM SQUARE CAROUSEL WITH CLICK-TO-ENLARGE --- */}
+                {/* --- 2. SQUARE IMAGE CAROUSEL --- */}
                 <div
-                  onClick={() =>
-                    images.length > 0 &&
-                    setLightboxState({ images, currentIndex: currentImgIndex })
-                  }
+                  onClick={() => {
+                    if (images.length > 0) {
+                      incrementViews(project.id);
+                      setLightboxState({
+                        images,
+                        currentIndex: currentImgIndex,
+                      });
+                    }
+                  }}
                   className="relative aspect-square w-full bg-slate-50 dark:bg-black flex items-center justify-center overflow-hidden border-b border-slate-100 dark:border-[#262626] cursor-pointer group"
                 >
                   {images.length > 0 ? (
@@ -294,14 +308,12 @@ export default function ProjectsPage() {
                         className="w-full h-full object-cover transition-all duration-300 group-hover:scale-[1.01]"
                       />
 
-                      {/* Expand Overlay Hint */}
                       <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white pointer-events-none">
                         <div className="flex items-center gap-1.5 bg-black/60 px-3.5 py-2 rounded-full backdrop-blur-md text-xs font-medium">
                           <Maximize2 size={14} /> Open Fullscreen Gallery
                         </div>
                       </div>
 
-                      {/* Navigation Arrows */}
                       {images.length > 1 && (
                         <>
                           <button
@@ -333,7 +345,7 @@ export default function ProjectsPage() {
                   )}
                 </div>
 
-                {/* --- 3. BOTTOM ACTION BAR (Like, Comment, Share) --- */}
+                {/* --- 3. BOTTOM ACTION BAR --- */}
                 <div className="p-4 space-y-3 bg-white dark:bg-[#121212]">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
@@ -374,7 +386,6 @@ export default function ProjectsPage() {
                       </button>
                     </div>
 
-                    {/* Carousel Page Indicator Dots */}
                     {images.length > 1 && (
                       <div className="flex gap-1.5 items-center">
                         {images.map((_, idx) => (
@@ -391,21 +402,29 @@ export default function ProjectsPage() {
                     )}
                   </div>
 
-                  {/* Notification Toast for Link Copied */}
                   {copiedAppId === project.id && (
-                    <div className="bg-sky-500 text-white text-[11px] font-semibold px-3 py-1 rounded-full w-max flex items-center gap-1.5 animate-in fade-in slide-in-from-bottom-1 duration-200">
-                      <Check size={12} /> Application Link Copied to Clipboard!
+                    <div className="bg-sky-500 text-white text-[11px] font-semibold px-3 py-1 rounded-full w-max flex items-center gap-1.5 animate-in fade-in duration-200">
+                      <Check size={12} /> Application Link Copied!
                     </div>
                   )}
 
-                  {/* Likes, Comments, and Shares Stats Display */}
-                  <div className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                    <span>{isLiked ? "101 views" : "100 views"}</span>
-                    <span className="text-slate-400">•</span>
-                    <span>{comments.length} comments</span>
-                    <span className="text-slate-400">•</span>
-                    <span>{shares} shares</span>
-                  </div>
+                  {/* Dynamic Stats Row (Hidden until user interacts) */}
+                  {hasInteracted && (
+                    <div className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 animate-in fade-in duration-200">
+                      <span>
+                        {views} {views === 1 ? "view" : "views"}
+                      </span>
+                      <span className="text-slate-400">•</span>
+                      <span>
+                        {comments.length}{" "}
+                        {comments.length === 1 ? "comment" : "comments"}
+                      </span>
+                      <span className="text-slate-400">•</span>
+                      <span>
+                        {shares} {shares === 1 ? "share" : "shares"}
+                      </span>
+                    </div>
+                  )}
 
                   {/* Caption & Description */}
                   <div className="text-xs space-y-1">
@@ -417,7 +436,7 @@ export default function ProjectsPage() {
                     </p>
                   </div>
 
-                  {/* Tech Stack Badges */}
+                  {/* Tech Badges */}
                   <div className="flex flex-wrap gap-1.5 pt-1">
                     {project.techStack.map((tech, idx) => (
                       <span
@@ -429,14 +448,13 @@ export default function ProjectsPage() {
                     ))}
                   </div>
 
-                  {/* --- 4. EXPANDABLE COMMENTS SECTION WITH COMMENT LIKES --- */}
+                  {/* --- 4. EXPANDABLE COMMENTS SECTION --- */}
                   {isCommentOpen && (
                     <div className="pt-3 border-t border-slate-100 dark:border-[#262626] space-y-3 animate-in fade-in duration-200">
                       <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
                         Viewer Comments ({comments.length})
                       </h4>
 
-                      {/* Comments List */}
                       <div className="space-y-2.5 max-h-48 overflow-y-auto pr-1">
                         {comments.length === 0 ? (
                           <p className="text-xs text-slate-400 italic">
@@ -466,7 +484,6 @@ export default function ProjectsPage() {
                                 </div>
                               </div>
 
-                              {/* Comment Like Button */}
                               <button
                                 onClick={() =>
                                   toggleCommentLike(project.id, comment.id)
@@ -488,7 +505,6 @@ export default function ProjectsPage() {
                         )}
                       </div>
 
-                      {/* Comment Input Box */}
                       <div className="flex gap-2 pt-1">
                         <input
                           type="text"
@@ -527,7 +543,6 @@ export default function ProjectsPage() {
           onClick={() => setLightboxState(null)}
           className="fixed inset-0 z-[120] bg-black/95 backdrop-blur-md flex flex-col items-center justify-between p-4 sm:p-8 cursor-pointer animate-in fade-in duration-200 select-none"
         >
-          {/* Top Bar (Counter & Close) */}
           <div
             onClick={(e) => e.stopPropagation()}
             className="w-full flex justify-between items-center max-w-6xl z-20 text-white"
@@ -545,7 +560,6 @@ export default function ProjectsPage() {
             </button>
           </div>
 
-          {/* Main Fullscreen Image Area */}
           <div className="relative max-w-6xl w-full flex-1 flex items-center justify-center my-4">
             {lightboxState.images.length > 1 && (
               <button
@@ -577,7 +591,6 @@ export default function ProjectsPage() {
             )}
           </div>
 
-          {/* Bottom Thumbnail Strip */}
           {lightboxState.images.length > 1 && (
             <div
               onClick={(e) => e.stopPropagation()}
