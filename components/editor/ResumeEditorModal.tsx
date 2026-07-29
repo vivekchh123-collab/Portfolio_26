@@ -1,32 +1,38 @@
 "use client";
 
-import { X, Upload, Key, Plus, Trash2 } from "lucide-react";
+import { X, Upload, Key, Plus, Trash2, Share2 } from "lucide-react";
+
+export interface SocialLink {
+  id: string;
+  platform: string;
+  url: string;
+}
 
 export interface ResumeData {
-  password: string;
-  name: string;
-  role: string;
-  aboutMe: string;
-  phone: string;
-  email: string;
-  website: string;
-  address: string;
-  photoUrl: string;
-  skills: string[];
-  languages: string[];
-  workExperience: Array<{
+  password?: string;
+  name?: string;
+  role?: string;
+  aboutMe?: string;
+  phone?: string;
+  email?: string;
+  socials?: SocialLink[];
+  address?: string;
+  photoUrl?: string;
+  skills?: string[];
+  languages?: string[];
+  workExperience?: Array<{
     title: string;
     company: string;
     period: string;
     desc: string;
   }>;
-  education: Array<{ degree: string; school: string; period: string }>;
+  education?: Array<{ degree: string; school: string; period: string }>;
 }
 
 interface ResumeEditorModalProps {
   isOpen: boolean;
   onClose: () => void;
-  resumeData: ResumeData;
+  resumeData?: ResumeData;
   setResumeData: React.Dispatch<React.SetStateAction<ResumeData>>;
 }
 
@@ -55,18 +61,49 @@ export default function ResumeEditorModal({
     }
   };
 
+  // --- Social Media Handlers ---
+  const addSocialLink = () => {
+    const newSocial: SocialLink = {
+      id: Date.now().toString(),
+      platform: "LinkedIn",
+      url: "https://",
+    };
+    setResumeData((prev) => ({
+      ...prev,
+      socials: [...(prev?.socials || []), newSocial],
+    }));
+  };
+
+  const handleSocialChange = (
+    id: string,
+    field: keyof SocialLink,
+    value: string,
+  ) => {
+    const updated = (resumeData?.socials || []).map((item) =>
+      item.id === id ? { ...item, [field]: value } : item,
+    );
+    setResumeData((prev) => ({ ...prev, socials: updated }));
+  };
+
+  const removeSocialLink = (id: string) => {
+    const updated = (resumeData?.socials || []).filter(
+      (item) => item.id !== id,
+    );
+    setResumeData((prev) => ({ ...prev, socials: updated }));
+  };
+
   // --- Work Experience Handlers ---
   const handleWorkChange = (index: number, field: string, value: string) => {
-    const updated = [...resumeData.workExperience];
+    const updated = [...(resumeData?.workExperience || [])];
     updated[index] = { ...updated[index], [field]: value };
-    setResumeData({ ...resumeData, workExperience: updated });
+    setResumeData((prev) => ({ ...prev, workExperience: updated }));
   };
 
   const addWorkExperience = () => {
-    setResumeData({
-      ...resumeData,
+    setResumeData((prev) => ({
+      ...prev,
       workExperience: [
-        ...resumeData.workExperience,
+        ...(prev?.workExperience || []),
         {
           title: "JOB TITLE",
           company: "Company Name",
@@ -74,14 +111,16 @@ export default function ResumeEditorModal({
           desc: "Description here...",
         },
       ],
-    });
+    }));
   };
 
   const removeWorkExperience = (index: number) => {
-    setResumeData({
-      ...resumeData,
-      workExperience: resumeData.workExperience.filter((_, i) => i !== index),
-    });
+    setResumeData((prev) => ({
+      ...prev,
+      workExperience: (prev?.workExperience || []).filter(
+        (_, i) => i !== index,
+      ),
+    }));
   };
 
   // --- Education Handlers ---
@@ -90,30 +129,43 @@ export default function ResumeEditorModal({
     field: string,
     value: string,
   ) => {
-    const updated = [...resumeData.education];
+    const updated = [...(resumeData?.education || [])];
     updated[index] = { ...updated[index], [field]: value };
-    setResumeData({ ...resumeData, education: updated });
+    setResumeData((prev) => ({ ...prev, education: updated }));
   };
 
   const addEducation = () => {
-    setResumeData({
-      ...resumeData,
+    setResumeData((prev) => ({
+      ...prev,
       education: [
-        ...resumeData.education,
+        ...(prev?.education || []),
         {
           degree: "DEGREE / DIPLOMA",
           school: "University / Institute",
           period: "2020 - 2024",
         },
       ],
-    });
+    }));
   };
 
   const removeEducation = (index: number) => {
-    setResumeData({
-      ...resumeData,
-      education: resumeData.education.filter((_, i) => i !== index),
-    });
+    setResumeData((prev) => ({
+      ...prev,
+      education: (prev?.education || []).filter((_, i) => i !== index),
+    }));
+  };
+
+  // Save to LocalStorage & Sync state
+  const handleSave = () => {
+    try {
+      if (resumeData) {
+        localStorage.setItem("user_resume_data", JSON.stringify(resumeData));
+        window.dispatchEvent(new Event("resume-updated"));
+      }
+    } catch (e) {
+      console.error("Failed to save resume to localStorage", e);
+    }
+    onClose();
   };
 
   return (
@@ -138,9 +190,9 @@ export default function ResumeEditorModal({
           </label>
           <input
             type="text"
-            value={resumeData.password}
+            value={resumeData?.password || ""}
             onChange={(e) =>
-              setResumeData({ ...resumeData, password: e.target.value })
+              setResumeData((prev) => ({ ...prev, password: e.target.value }))
             }
             placeholder="Set password to unlock resume"
             className="w-full p-2 border rounded-lg text-sm bg-white dark:bg-slate-800 border-indigo-200 dark:border-indigo-800 text-slate-900 dark:text-white focus:outline-indigo-600 font-mono"
@@ -155,9 +207,9 @@ export default function ResumeEditorModal({
             </label>
             <input
               type="text"
-              value={resumeData.name}
+              value={resumeData?.name || ""}
               onChange={(e) =>
-                setResumeData({ ...resumeData, name: e.target.value })
+                setResumeData((prev) => ({ ...prev, name: e.target.value }))
               }
               className="w-full mt-1 p-2 border rounded-lg text-sm bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700"
             />
@@ -169,9 +221,9 @@ export default function ResumeEditorModal({
             </label>
             <input
               type="text"
-              value={resumeData.role}
+              value={resumeData?.role || ""}
               onChange={(e) =>
-                setResumeData({ ...resumeData, role: e.target.value })
+                setResumeData((prev) => ({ ...prev, role: e.target.value }))
               }
               className="w-full mt-1 p-2 border rounded-lg text-sm bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700"
             />
@@ -193,9 +245,12 @@ export default function ResumeEditorModal({
               </label>
               <input
                 type="text"
-                value={resumeData.photoUrl}
+                value={resumeData?.photoUrl || ""}
                 onChange={(e) =>
-                  setResumeData({ ...resumeData, photoUrl: e.target.value })
+                  setResumeData((prev) => ({
+                    ...prev,
+                    photoUrl: e.target.value,
+                  }))
                 }
                 placeholder="Or paste URL"
                 className="flex-1 p-2 border rounded-lg text-xs bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700"
@@ -209,9 +264,9 @@ export default function ResumeEditorModal({
             </label>
             <textarea
               rows={3}
-              value={resumeData.aboutMe}
+              value={resumeData?.aboutMe || ""}
               onChange={(e) =>
-                setResumeData({ ...resumeData, aboutMe: e.target.value })
+                setResumeData((prev) => ({ ...prev, aboutMe: e.target.value }))
               }
               className="w-full mt-1 p-2 border rounded-lg text-sm bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700"
             />
@@ -223,9 +278,9 @@ export default function ResumeEditorModal({
             </label>
             <input
               type="text"
-              value={resumeData.phone}
+              value={resumeData?.phone || ""}
               onChange={(e) =>
-                setResumeData({ ...resumeData, phone: e.target.value })
+                setResumeData((prev) => ({ ...prev, phone: e.target.value }))
               }
               className="w-full mt-1 p-2 border rounded-lg text-sm bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700"
             />
@@ -237,37 +292,85 @@ export default function ResumeEditorModal({
             </label>
             <input
               type="text"
-              value={resumeData.email}
+              value={resumeData?.email || ""}
               onChange={(e) =>
-                setResumeData({ ...resumeData, email: e.target.value })
+                setResumeData((prev) => ({ ...prev, email: e.target.value }))
               }
               className="w-full mt-1 p-2 border rounded-lg text-sm bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700"
             />
           </div>
 
-          <div>
-            <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-              Website
-            </label>
-            <input
-              type="text"
-              value={resumeData.website}
-              onChange={(e) =>
-                setResumeData({ ...resumeData, website: e.target.value })
-              }
-              className="w-full mt-1 p-2 border rounded-lg text-sm bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700"
-            />
+          {/* DYNAMIC SOCIAL MEDIA SECTION */}
+          <div className="md:col-span-2 space-y-3 pt-2">
+            <div className="flex justify-between items-center">
+              <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase flex items-center gap-1.5">
+                <Share2 size={14} className="text-indigo-500" /> Social Media
+                Links
+              </label>
+              <button
+                type="button"
+                onClick={addSocialLink}
+                className="flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium transition cursor-pointer"
+              >
+                <Plus size={12} /> Add Social Link
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              {resumeData?.socials && resumeData.socials.length > 0 ? (
+                resumeData.socials.map((social) => (
+                  <div
+                    key={social.id}
+                    className="flex items-center gap-2 p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50"
+                  >
+                    <input
+                      type="text"
+                      placeholder="Platform (e.g. LinkedIn)"
+                      value={social.platform || ""}
+                      onChange={(e) =>
+                        handleSocialChange(
+                          social.id,
+                          "platform",
+                          e.target.value,
+                        )
+                      }
+                      className="w-1/3 p-2 border rounded-lg text-xs bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 font-semibold"
+                    />
+                    <input
+                      type="text"
+                      placeholder="URL (https://...)"
+                      value={social.url || ""}
+                      onChange={(e) =>
+                        handleSocialChange(social.id, "url", e.target.value)
+                      }
+                      className="flex-1 p-2 border rounded-lg text-xs bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeSocialLink(social.id)}
+                      className="p-2 text-slate-400 hover:text-rose-500 transition cursor-pointer"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <p className="text-xs text-slate-400 italic">
+                  No social media links added yet.
+                </p>
+              )}
+            </div>
           </div>
 
-          <div>
+          <div className="md:col-span-2">
             <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">
               Address
             </label>
             <input
               type="text"
-              value={resumeData.address}
+              value={resumeData?.address || ""}
               onChange={(e) =>
-                setResumeData({ ...resumeData, address: e.target.value })
+                setResumeData((prev) => ({ ...prev, address: e.target.value }))
               }
               className="w-full mt-1 p-2 border rounded-lg text-sm bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700"
             />
@@ -279,12 +382,12 @@ export default function ResumeEditorModal({
             </label>
             <input
               type="text"
-              value={resumeData.skills.join(", ")}
+              value={(resumeData?.skills || []).join(", ")}
               onChange={(e) =>
-                setResumeData({
-                  ...resumeData,
+                setResumeData((prev) => ({
+                  ...prev,
                   skills: e.target.value.split(",").map((s) => s.trim()),
-                })
+                }))
               }
               className="w-full mt-1 p-2 border rounded-lg text-sm bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700"
             />
@@ -296,12 +399,12 @@ export default function ResumeEditorModal({
             </label>
             <input
               type="text"
-              value={resumeData.languages.join(", ")}
+              value={(resumeData?.languages || []).join(", ")}
               onChange={(e) =>
-                setResumeData({
-                  ...resumeData,
+                setResumeData((prev) => ({
+                  ...prev,
                   languages: e.target.value.split(",").map((l) => l.trim()),
-                })
+                }))
               }
               className="w-full mt-1 p-2 border rounded-lg text-sm bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700"
             />
@@ -323,7 +426,7 @@ export default function ResumeEditorModal({
             </button>
           </div>
 
-          {resumeData.workExperience.map((item, index) => (
+          {(resumeData?.workExperience || []).map((item, index) => (
             <div
               key={index}
               className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 space-y-3 relative"
@@ -343,7 +446,7 @@ export default function ResumeEditorModal({
                   </label>
                   <input
                     type="text"
-                    value={item.title}
+                    value={item.title || ""}
                     onChange={(e) =>
                       handleWorkChange(index, "title", e.target.value)
                     }
@@ -356,7 +459,7 @@ export default function ResumeEditorModal({
                   </label>
                   <input
                     type="text"
-                    value={item.company}
+                    value={item.company || ""}
                     onChange={(e) =>
                       handleWorkChange(index, "company", e.target.value)
                     }
@@ -369,7 +472,7 @@ export default function ResumeEditorModal({
                   </label>
                   <input
                     type="text"
-                    value={item.period}
+                    value={item.period || ""}
                     onChange={(e) =>
                       handleWorkChange(index, "period", e.target.value)
                     }
@@ -384,7 +487,7 @@ export default function ResumeEditorModal({
                 </label>
                 <textarea
                   rows={2}
-                  value={item.desc}
+                  value={item.desc || ""}
                   onChange={(e) =>
                     handleWorkChange(index, "desc", e.target.value)
                   }
@@ -410,7 +513,7 @@ export default function ResumeEditorModal({
             </button>
           </div>
 
-          {resumeData.education.map((item, index) => (
+          {(resumeData?.education || []).map((item, index) => (
             <div
               key={index}
               className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 space-y-3 relative"
@@ -430,7 +533,7 @@ export default function ResumeEditorModal({
                   </label>
                   <input
                     type="text"
-                    value={item.degree}
+                    value={item.degree || ""}
                     onChange={(e) =>
                       handleEducationChange(index, "degree", e.target.value)
                     }
@@ -443,7 +546,7 @@ export default function ResumeEditorModal({
                   </label>
                   <input
                     type="text"
-                    value={item.school}
+                    value={item.school || ""}
                     onChange={(e) =>
                       handleEducationChange(index, "school", e.target.value)
                     }
@@ -456,7 +559,7 @@ export default function ResumeEditorModal({
                   </label>
                   <input
                     type="text"
-                    value={item.period}
+                    value={item.period || ""}
                     onChange={(e) =>
                       handleEducationChange(index, "period", e.target.value)
                     }
@@ -470,7 +573,7 @@ export default function ResumeEditorModal({
 
         {/* Save Button */}
         <button
-          onClick={onClose}
+          onClick={handleSave}
           className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg text-sm transition mt-4 cursor-pointer"
         >
           Save Resume Changes

@@ -1,55 +1,84 @@
 "use client";
 
-import { useState, createContext, useContext } from "react";
-import { Inter } from "next/font/google";
-import "./globals.css";
+import { createContext, useContext, useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
+import "@/app/globals.css";
 
-const inter = Inter({ subsets: ["latin"] });
-
-interface ProfileContextType {
+export interface ProfileContextType {
   name: string;
-  setName: (v: string) => void;
-  quote: string;
-  setQuote: (v: string) => void;
+  setName: (val: string) => void;
+  role: string;
+  setRole: (val: string) => void;
+  bio: string;
+  setBio: (val: string) => void;
   profileImg: string;
-  setProfileImg: (v: string) => void;
+  setProfileImg: (val: string) => void;
   signature: string;
-  setSignature: (v: string) => void;
+  setSignature: (val: string) => void;
 }
 
-const ProfileContext = createContext<ProfileContextType | null>(null);
-
-export const useProfile = () => {
-  const context = useContext(ProfileContext);
-  if (!context)
-    throw new Error("useProfile must be used within ProfileProvider");
-  return context;
+const defaultProfile: ProfileContextType = {
+  name: "Vivek Chaurasiya",
+  setName: () => {},
+  role: "Full-Stack Developer & ECE Student",
+  setRole: () => {},
+  bio: "Passionate developer and engineering student dedicated to crafting clean user interfaces, scalable web applications, and interactive digital experiences.",
+  setBio: () => {},
+  profileImg:
+    "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=1000&auto=format&fit=crop",
+  setProfileImg: () => {},
+  signature: "Vivek",
+  setSignature: () => {},
 };
+
+const ProfileContext = createContext<ProfileContextType>(defaultProfile);
+
+export function useProfile() {
+  return useContext(ProfileContext);
+}
 
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [name, setName] = useState("VIVEK");
-  const [quote, setQuote] = useState("Full-Stack Developer & ECE Engineer");
+  const [name, setName] = useState("Vivek Chaurasiya");
+  const [role, setRole] = useState("Full-Stack Developer & ECE Student");
+  const [bio, setBio] = useState(
+    "Passionate developer and engineering student dedicated to crafting clean user interfaces, scalable web applications, and interactive digital experiences.",
+  );
   const [profileImg, setProfileImg] = useState(
     "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=1000&auto=format&fit=crop",
   );
-  const [signature, setSignature] = useState("Vivek Chaurasiya");
+  const [signature, setSignature] = useState("Vivek");
+
+  useEffect(() => {
+    const saved = localStorage.getItem("user_profile_data");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed.name) setName(parsed.name);
+        if (parsed.role) setRole(parsed.role);
+        if (parsed.bio) setBio(parsed.bio);
+        if (parsed.profileImg) setProfileImg(parsed.profileImg);
+        if (parsed.signature) setSignature(parsed.signature);
+      } catch (e) {
+        console.error("Failed to load profile context", e);
+      }
+    }
+  }, []);
 
   return (
-    <html lang="en" className="dark bg-slate-950 transition-colors">
-      <body
-        className={`${inter.className} bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 min-h-screen flex flex-col m-0 p-0`}
-      >
+    <html lang="en" className="dark">
+      <body className="bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 min-h-screen antialiased transition-colors">
         <ProfileContext.Provider
           value={{
             name,
             setName,
-            quote,
-            setQuote,
+            role,
+            setRole,
+            bio,
+            setBio,
             profileImg,
             setProfileImg,
             signature,
@@ -57,10 +86,7 @@ export default function RootLayout({
           }}
         >
           <Navbar />
-          {/* Main content wrapper */}
-          <div className="flex-1 w-full max-w-7xl mx-auto px-6 bg-transparent">
-            {children}
-          </div>
+          <div className="max-w-7xl mx-auto px-6">{children}</div>
         </ProfileContext.Provider>
       </body>
     </html>

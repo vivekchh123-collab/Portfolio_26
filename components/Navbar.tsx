@@ -17,6 +17,7 @@ import ProjectsEditorModal from "./editor/ProjectsEditorModal";
 import AppShowcaseEditorModal, {
   ProjectItem,
 } from "./editor/AppShowcaseEditorModal";
+import ResumeEditorModal, { ResumeData } from "./editor/ResumeEditorModal";
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -27,9 +28,10 @@ export default function Navbar() {
   const [isHomeEditModalOpen, setIsHomeEditModalOpen] = useState(false);
   const [isProjectsEditModalOpen, setIsProjectsEditModalOpen] = useState(false);
   const [isAppShowcaseModalOpen, setIsAppShowcaseModalOpen] = useState(false);
+  const [isResumeEditModalOpen, setIsResumeEditModalOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
 
-  // Dynamic Profile URLs
+  // Profile Links
   const [githubUrl, setGithubUrl] = useState(
     "https://github.com/vivekchh123-collab",
   );
@@ -37,7 +39,7 @@ export default function Navbar() {
     "https://leetcode.com/u/vivek_chaurasiya_14/",
   );
 
-  // Dynamic Projects State
+  // Default Projects Fallback
   const defaultProjects: ProjectItem[] = [
     {
       id: "1",
@@ -50,7 +52,51 @@ export default function Navbar() {
     },
   ];
 
-  const [projects, setProjects] = useState<ProjectItem[]>(defaultProjects);
+  const [projects, setProjects] = useState<ProjectItem[]>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("user_projects_data");
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
+    return defaultProjects;
+  });
+
+  // Default Resume Fallback (Prevents 'undefined' errors)
+  const defaultResume: ResumeData = {
+    password: "",
+    name: "",
+    role: "",
+    aboutMe: "",
+    phone: "",
+    email: "",
+    socials: [],
+    address: "",
+    photoUrl: "",
+    skills: [],
+    languages: [],
+    workExperience: [],
+    education: [],
+  };
+
+  const [resumeData, setResumeData] = useState<ResumeData>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("user_resume_data");
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
+    return defaultResume;
+  });
 
   const menuRef = useRef<HTMLDivElement>(null);
   const projectsRef = useRef<HTMLDivElement>(null);
@@ -59,25 +105,11 @@ export default function Navbar() {
     document.documentElement.classList.add("dark");
   }, []);
 
-  // Load and sync projects from localStorage
   useEffect(() => {
-    const loadProjects = () => {
-      const saved = localStorage.getItem("user_projects_data");
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setProjects(parsed);
-          }
-        } catch (e) {
-          console.error("Failed to parse projects in Navbar", e);
-        }
-      }
-    };
-
-    loadProjects();
-    window.addEventListener("projects-updated", loadProjects);
-    return () => window.removeEventListener("projects-updated", loadProjects);
+    const handleOpenResume = () => setIsResumeEditModalOpen(true);
+    window.addEventListener("open-resume-editor", handleOpenResume);
+    return () =>
+      window.removeEventListener("open-resume-editor", handleOpenResume);
   }, []);
 
   useEffect(() => {
@@ -110,7 +142,7 @@ export default function Navbar() {
     <>
       <nav className="fixed top-0 left-0 right-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 transition-colors">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          {/* Top-Left V Logo Dropdown Menu */}
+          {/* Top-Left Logo Dropdown Menu */}
           <div className="relative" ref={menuRef}>
             <button
               onClick={() => setIsOpen(!isOpen)}
@@ -128,16 +160,14 @@ export default function Navbar() {
               </svg>
             </button>
 
-            {/* V Logo Editor Options */}
+            {/* Logo Options */}
             {isOpen && (
               <div className="absolute left-0 mt-2 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl py-2 z-50">
                 {pathname === "/resume" ? (
                   <button
                     onClick={() => {
                       setIsOpen(false);
-                      window.dispatchEvent(
-                        new CustomEvent("open-resume-editor"),
-                      );
+                      setIsResumeEditModalOpen(true);
                     }}
                     className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition text-left cursor-pointer"
                   >
@@ -195,7 +225,7 @@ export default function Navbar() {
             )}
           </div>
 
-          {/* Top Right Navigation Links + Dark Mode Button */}
+          {/* Top Right Navigation */}
           <div className="flex gap-8 items-center font-medium text-slate-600 dark:text-slate-300 text-sm tracking-wide">
             <Link
               href="/"
@@ -204,7 +234,6 @@ export default function Navbar() {
               About Me
             </Link>
 
-            {/* PROJECT LINK + DROPDOWN ARROW */}
             <div className="relative flex items-center" ref={projectsRef}>
               <Link
                 href="/projects"
@@ -225,7 +254,6 @@ export default function Navbar() {
                 />
               </button>
 
-              {/* GitHub & LeetCode Menu */}
               {isProjectsDropdownOpen && (
                 <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl py-2 z-50">
                   <a
@@ -279,7 +307,6 @@ export default function Navbar() {
               Resume
             </Link>
 
-            {/* TOP RIGHT DARK MODE BUTTON */}
             <button
               onClick={toggleDarkMode}
               className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 transition text-slate-700 dark:text-slate-200 cursor-pointer"
@@ -317,6 +344,14 @@ export default function Navbar() {
         onClose={() => setIsAppShowcaseModalOpen(false)}
         projects={projects}
         setProjects={setProjects}
+      />
+
+      {/* Fixed: Props resumeData and setResumeData now passed correctly */}
+      <ResumeEditorModal
+        isOpen={isResumeEditModalOpen}
+        onClose={() => setIsResumeEditModalOpen(false)}
+        resumeData={resumeData}
+        setResumeData={setResumeData}
       />
     </>
   );
