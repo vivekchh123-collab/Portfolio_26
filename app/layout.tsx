@@ -3,8 +3,14 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer"; // Import Footer
+import { Caveat } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import "@/app/globals.css";
+
+const caveat = Caveat({
+  subsets: ["latin"],
+  variable: "--font-signature",
+});
 
 export interface ProfileContextType {
   name: string;
@@ -72,7 +78,7 @@ export default function RootLayout({
 
   return (
     <ClerkProvider>
-      <html lang="en" className="dark">
+      <html lang="en" className={`${caveat.variable} dark`}>
         <body className="bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 min-h-screen antialiased transition-colors flex flex-col justify-between">
           <ProfileContext.Provider
             value={{
