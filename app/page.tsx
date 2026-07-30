@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import {
@@ -10,7 +10,7 @@ import {
   Users,
   HeartHandshake,
   AtSign,
-  Copy, // Use standard Copy icon
+  Copy,
   Check,
   Share2,
 } from "lucide-react";
@@ -18,13 +18,16 @@ import { Great_Vibes } from "next/font/google";
 import { useProfile } from "./layout";
 import SignatureLoader from "@/components/SignatureLoader";
 
+// Force Next.js to dynamically render this page instead of static pre-rendering
+export const dynamic = "force-dynamic";
+
 const signatureFont = Great_Vibes({
   weight: "400",
   subsets: ["latin"],
   display: "swap",
 });
 
-export default function Home() {
+function HomeContent() {
   const profileContext = useProfile();
   const { isSignedIn } = useUser();
   const searchParams = useSearchParams();
@@ -36,18 +39,17 @@ export default function Home() {
 
   // Editable Username State (Saved in LocalStorage / Live DB)
   const [username, setUsername] = useState("vivek_chaurasiya");
-  // isEditingUsername state is REMOVED as requested.
   const [copiedLink, setCopiedLink] = useState(false);
-  const [copiedUsername, setCopiedUsername] = useState(false); // New copy state
+  const [copiedUsername, setCopiedUsername] = useState(false);
 
   // View Mode: Viewing Own Profile vs Visitor Search
   const [viewedUser, setViewedUser] = useState<string | null>(null);
 
   // Engagement States: All start at ZERO
   const [isFollowing, setIsFollowing] = useState(false);
-  const [followerCount, setFollowerCount] = useState(0); // Set to 0
-  const [followingCount, setFollowingCount] = useState(0); // Set to 0
-  const [likeCount, setLikeCount] = useState(0); // Set to 0
+  const [followerCount, setFollowerCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
+  const [likeCount, setLikeCount] = useState(0);
   const [hasLiked, setHasLiked] = useState(false);
 
   // Load saved username on client startup
@@ -71,8 +73,6 @@ export default function Home() {
       );
   }, []);
 
-  // handleSaveUsername is REMOVED from page.tsx
-
   // Generate and Copy Direct Shareable HTTP Link
   const handleCopyShareLink = () => {
     if (typeof window !== "undefined") {
@@ -85,7 +85,7 @@ export default function Home() {
     }
   };
 
-  // NEW function to copy username
+  // Copy unique username
   const handleCopyUsername = () => {
     if (typeof window !== "undefined") {
       navigator.clipboard.writeText(activeUsername);
@@ -129,7 +129,7 @@ export default function Home() {
                       Hi, I'm
                     </p>
 
-                    {/* Share Direct View-Only Link Button: ONLY for own profile */}
+                    {/* Share Direct View-Only Link Button */}
                     {!isViewingGuest && (
                       <button
                         onClick={handleCopyShareLink}
@@ -157,14 +157,13 @@ export default function Home() {
                     {activeName}
                   </h1>
 
-                  {/* USERNAME COMPONENT (MODIFIED: Remove Edit, Add Copy) */}
+                  {/* USERNAME COMPONENT */}
                   <div className="flex items-center gap-2 pt-1">
                     <AtSign size={14} className="text-indigo-500" />
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-mono font-semibold text-indigo-600 dark:text-indigo-400">
                         {activeUsername}
                       </span>
-                      {/* Replace Edit button with Copy button */}
                       <button
                         onClick={handleCopyUsername}
                         className="text-slate-400 hover:text-indigo-500 transition cursor-pointer"
@@ -313,5 +312,14 @@ export default function Home() {
         </div>
       </main>
     </>
+  );
+}
+
+// Default Export wrapped in Suspense boundary
+export default function Home() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-900" />}>
+      <HomeContent />
+    </Suspense>
   );
 }
