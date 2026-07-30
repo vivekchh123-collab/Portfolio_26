@@ -4,6 +4,13 @@ import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  SignInButton,
+  SignUpButton,
+  UserButton,
+  useUser,
+  useClerk,
+} from "@clerk/nextjs";
+import {
   Edit3,
   Sun,
   Moon,
@@ -11,6 +18,9 @@ import {
   ChevronDown,
   Code2,
   Layers,
+  LogIn,
+  UserPlus,
+  Lock,
 } from "lucide-react";
 import HomeEditorModal from "./editor/HomeEditorModal";
 import ProjectsEditorModal from "./editor/ProjectsEditorModal";
@@ -24,12 +34,26 @@ export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [isProjectsDropdownOpen, setIsProjectsDropdownOpen] = useState(false);
 
+  // Clerk Auth Hooks
+  const { isSignedIn, isLoaded } = useUser();
+  const { openSignIn } = useClerk();
+
   // Editor Modal States
   const [isHomeEditModalOpen, setIsHomeEditModalOpen] = useState(false);
   const [isProjectsEditModalOpen, setIsProjectsEditModalOpen] = useState(false);
   const [isAppShowcaseModalOpen, setIsAppShowcaseModalOpen] = useState(false);
   const [isResumeEditModalOpen, setIsResumeEditModalOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
+
+  // Helper function to guard editor actions
+  const handleProtectedAction = (action: () => void) => {
+    setIsOpen(false);
+    if (!isSignedIn) {
+      openSignIn();
+    } else {
+      action();
+    }
+  };
 
   // Profile Links
   const [githubUrl, setGithubUrl] = useState(
@@ -67,7 +91,7 @@ export default function Navbar() {
     return defaultProjects;
   });
 
-  // Default Resume Fallback (Prevents 'undefined' errors)
+  // Default Resume Fallback
   const defaultResume: ResumeData = {
     password: "",
     name: "",
@@ -105,12 +129,19 @@ export default function Navbar() {
     document.documentElement.classList.add("dark");
   }, []);
 
+  // Protect global event triggers
   useEffect(() => {
-    const handleOpenResume = () => setIsResumeEditModalOpen(true);
+    const handleOpenResume = () => {
+      if (!isSignedIn) {
+        openSignIn();
+      } else {
+        setIsResumeEditModalOpen(true);
+      }
+    };
     window.addEventListener("open-resume-editor", handleOpenResume);
     return () =>
       window.removeEventListener("open-resume-editor", handleOpenResume);
-  }, []);
+  }, [isSignedIn, openSignIn]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -165,60 +196,82 @@ export default function Navbar() {
               <div className="absolute left-0 mt-2 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl py-2 z-50">
                 {pathname === "/resume" ? (
                   <button
-                    onClick={() => {
-                      setIsOpen(false);
-                      setIsResumeEditModalOpen(true);
-                    }}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition text-left cursor-pointer"
+                    onClick={() =>
+                      handleProtectedAction(() =>
+                        setIsResumeEditModalOpen(true),
+                      )
+                    }
+                    className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition text-left cursor-pointer"
                   >
-                    <FileText
-                      size={16}
-                      className="text-indigo-600 dark:text-indigo-400"
-                    />
-                    Edit Resume Content
+                    <div className="flex items-center gap-3">
+                      <FileText
+                        size={16}
+                        className="text-indigo-600 dark:text-indigo-400"
+                      />
+                      <span>Edit Resume Content</span>
+                    </div>
+                    {!isSignedIn && (
+                      <Lock size={14} className="text-amber-500" />
+                    )}
                   </button>
                 ) : pathname === "/projects" ? (
                   <>
                     <button
-                      onClick={() => {
-                        setIsOpen(false);
-                        setIsAppShowcaseModalOpen(true);
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition text-left cursor-pointer"
+                      onClick={() =>
+                        handleProtectedAction(() =>
+                          setIsAppShowcaseModalOpen(true),
+                        )
+                      }
+                      className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition text-left cursor-pointer"
                     >
-                      <Layers
-                        size={16}
-                        className="text-indigo-600 dark:text-indigo-400"
-                      />
-                      Edit Projects Showcase
+                      <div className="flex items-center gap-3">
+                        <Layers
+                          size={16}
+                          className="text-indigo-600 dark:text-indigo-400"
+                        />
+                        <span>Edit Projects Showcase</span>
+                      </div>
+                      {!isSignedIn && (
+                        <Lock size={14} className="text-amber-500" />
+                      )}
                     </button>
                     <button
-                      onClick={() => {
-                        setIsOpen(false);
-                        setIsProjectsEditModalOpen(true);
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition text-left cursor-pointer"
+                      onClick={() =>
+                        handleProtectedAction(() =>
+                          setIsProjectsEditModalOpen(true),
+                        )
+                      }
+                      className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition text-left cursor-pointer"
                     >
-                      <Code2
-                        size={16}
-                        className="text-indigo-600 dark:text-indigo-400"
-                      />
-                      Edit Developer Links
+                      <div className="flex items-center gap-3">
+                        <Code2
+                          size={16}
+                          className="text-indigo-600 dark:text-indigo-400"
+                        />
+                        <span>Edit Developer Links</span>
+                      </div>
+                      {!isSignedIn && (
+                        <Lock size={14} className="text-amber-500" />
+                      )}
                     </button>
                   </>
                 ) : (
                   <button
-                    onClick={() => {
-                      setIsOpen(false);
-                      setIsHomeEditModalOpen(true);
-                    }}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition text-left cursor-pointer"
+                    onClick={() =>
+                      handleProtectedAction(() => setIsHomeEditModalOpen(true))
+                    }
+                    className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition text-left cursor-pointer"
                   >
-                    <Edit3
-                      size={16}
-                      className="text-indigo-600 dark:text-indigo-400"
-                    />
-                    Edit Homepage Content
+                    <div className="flex items-center gap-3">
+                      <Edit3
+                        size={16}
+                        className="text-indigo-600 dark:text-indigo-400"
+                      />
+                      <span>Edit Homepage Content</span>
+                    </div>
+                    {!isSignedIn && (
+                      <Lock size={14} className="text-amber-500" />
+                    )}
                   </button>
                 )}
               </div>
@@ -226,7 +279,7 @@ export default function Navbar() {
           </div>
 
           {/* Top Right Navigation */}
-          <div className="flex gap-8 items-center font-medium text-slate-600 dark:text-slate-300 text-sm tracking-wide">
+          <div className="flex gap-6 sm:gap-8 items-center font-medium text-slate-600 dark:text-slate-300 text-sm tracking-wide">
             <Link
               href="/"
               className="hover:text-black dark:hover:text-white transition"
@@ -250,7 +303,9 @@ export default function Navbar() {
               >
                 <ChevronDown
                   size={14}
-                  className={`transition-transform duration-200 ${isProjectsDropdownOpen ? "rotate-180" : ""}`}
+                  className={`transition-transform duration-200 ${
+                    isProjectsDropdownOpen ? "rotate-180" : ""
+                  }`}
                 />
               </button>
 
@@ -307,6 +362,7 @@ export default function Navbar() {
               Resume
             </Link>
 
+            {/* Dark Mode Toggle */}
             <button
               onClick={toggleDarkMode}
               className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 transition text-slate-700 dark:text-slate-200 cursor-pointer"
@@ -320,39 +376,66 @@ export default function Navbar() {
                 <Moon size={18} className="text-indigo-600" />
               )}
             </button>
+
+            {/* SEPARATED LOG IN & SIGN UP BUTTONS */}
+            {isLoaded && !isSignedIn && (
+              <div className="flex items-center gap-2">
+                {/* 1. Log In Button (Ghost / Outline Style) */}
+                <SignInButton mode="modal">
+                  <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold transition cursor-pointer border border-transparent hover:border-slate-300 dark:hover:border-slate-700">
+                    <LogIn size={14} />
+                    <span>Log In</span>
+                  </button>
+                </SignInButton>
+
+                {/* 2. Sign Up Button (Primary Indigo Fill Style) */}
+                <SignUpButton mode="modal">
+                  <button className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition shadow-sm cursor-pointer">
+                    <UserPlus size={14} />
+                    <span>Sign Up</span>
+                  </button>
+                </SignUpButton>
+              </div>
+            )}
+
+            {/* Logged-In User Avatar */}
+            {isLoaded && isSignedIn && <UserButton />}
           </div>
         </div>
       </nav>
 
       {/* Editor Components */}
-      <HomeEditorModal
-        isOpen={isHomeEditModalOpen}
-        onClose={() => setIsHomeEditModalOpen(false)}
-      />
+      {isSignedIn && (
+        <>
+          <HomeEditorModal
+            isOpen={isHomeEditModalOpen}
+            onClose={() => setIsHomeEditModalOpen(false)}
+          />
 
-      <ProjectsEditorModal
-        isOpen={isProjectsEditModalOpen}
-        onClose={() => setIsProjectsEditModalOpen(false)}
-        githubUrl={githubUrl}
-        setGithubUrl={setGithubUrl}
-        leetcodeUrl={leetcodeUrl}
-        setLeetcodeUrl={setLeetcodeUrl}
-      />
+          <ProjectsEditorModal
+            isOpen={isProjectsEditModalOpen}
+            onClose={() => setIsProjectsEditModalOpen(false)}
+            githubUrl={githubUrl}
+            setGithubUrl={setGithubUrl}
+            leetcodeUrl={leetcodeUrl}
+            setLeetcodeUrl={setLeetcodeUrl}
+          />
 
-      <AppShowcaseEditorModal
-        isOpen={isAppShowcaseModalOpen}
-        onClose={() => setIsAppShowcaseModalOpen(false)}
-        projects={projects}
-        setProjects={setProjects}
-      />
+          <AppShowcaseEditorModal
+            isOpen={isAppShowcaseModalOpen}
+            onClose={() => setIsAppShowcaseModalOpen(false)}
+            projects={projects}
+            setProjects={setProjects}
+          />
 
-      {/* Fixed: Props resumeData and setResumeData now passed correctly */}
-      <ResumeEditorModal
-        isOpen={isResumeEditModalOpen}
-        onClose={() => setIsResumeEditModalOpen(false)}
-        resumeData={resumeData}
-        setResumeData={setResumeData}
-      />
+          <ResumeEditorModal
+            isOpen={isResumeEditModalOpen}
+            onClose={() => setIsResumeEditModalOpen(false)}
+            resumeData={resumeData}
+            setResumeData={setResumeData}
+          />
+        </>
+      )}
     </>
   );
 }

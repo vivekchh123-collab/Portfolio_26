@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer"; // Import Footer
+import { ClerkProvider } from "@clerk/nextjs";
 import "@/app/globals.css";
 
 export interface ProfileContextType {
@@ -70,27 +71,31 @@ export default function RootLayout({
   }, []);
 
   return (
-    <html lang="en" className="dark">
-      <body className="bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 min-h-screen antialiased transition-colors flex flex-col justify-between">
-        <ProfileContext.Provider
-          value={{
-            name,
-            setName,
-            role,
-            setRole,
-            bio,
-            setBio,
-            profileImg,
-            setProfileImg,
-            signature,
-            setSignature,
-          }}
-        >
-          <Navbar />
-          <div className="max-w-7xl mx-auto px-6 flex-1 w-full">{children}</div>
-          <Footer /> {/* Render Footer at the bottom */}
-        </ProfileContext.Provider>
-      </body>
-    </html>
+    <ClerkProvider>
+      <html lang="en" className="dark">
+        <body className="bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 min-h-screen antialiased transition-colors flex flex-col justify-between">
+          <ProfileContext.Provider
+            value={{
+              name,
+              setName,
+              role,
+              setRole,
+              bio,
+              setBio,
+              profileImg,
+              setProfileImg,
+              signature,
+              setSignature,
+            }}
+          >
+            <Navbar />
+            <div className="max-w-7xl mx-auto px-6 flex-1 w-full">
+              {children}
+            </div>
+            <Footer /> {/* Render Footer at the bottom */}
+          </ProfileContext.Provider>
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }
