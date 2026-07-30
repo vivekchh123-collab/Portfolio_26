@@ -1,12 +1,18 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
+import { useUser } from "@clerk/nextjs";
 import {
   Heart,
   UserPlus,
   UserCheck,
   Users,
   HeartHandshake,
+  AtSign,
+  Copy, // Use standard Copy icon
+  Check,
+  Share2,
 } from "lucide-react";
 import { Great_Vibes } from "next/font/google";
 import { useProfile } from "./layout";
@@ -20,88 +26,164 @@ const signatureFont = Great_Vibes({
 
 export default function Home() {
   const profileContext = useProfile();
+  const { isSignedIn } = useUser();
+  const searchParams = useSearchParams();
 
-  // Loading State for Signature Intro Animation
+  // Read ?user= parameter from URL
+  const searchedUserFromUrl = searchParams.get("user");
+
   const [isLoading, setIsLoading] = useState(true);
 
-  // Interactive Engagement States
+  // Editable Username State (Saved in LocalStorage / Live DB)
+  const [username, setUsername] = useState("vivek_chaurasiya");
+  // isEditingUsername state is REMOVED as requested.
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedUsername, setCopiedUsername] = useState(false); // New copy state
+
+  // View Mode: Viewing Own Profile vs Visitor Search
+  const [viewedUser, setViewedUser] = useState<string | null>(null);
+
+  // Engagement States: All start at ZERO
   const [isFollowing, setIsFollowing] = useState(false);
-  const [followerCount, setFollowerCount] = useState(0);
-  const [followingCount] = useState(0);
-  const [likeCount, setLikeCount] = useState(0);
+  const [followerCount, setFollowerCount] = useState(0); // Set to 0
+  const [followingCount, setFollowingCount] = useState(0); // Set to 0
+  const [likeCount, setLikeCount] = useState(0); // Set to 0
   const [hasLiked, setHasLiked] = useState(false);
 
-  const profile = {
-    name: profileContext?.name || "Vivek Chaurasiya",
-    role: profileContext?.role || "Full-Stack Developer & ECE Student",
-    bio:
-      profileContext?.bio ||
-      "Passionate developer and engineering student dedicated to crafting clean user interfaces, scalable web applications, and interactive digital experiences.",
-    profileImg:
-      profileContext?.profileImg ||
-      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=1000&auto=format&fit=crop",
-    signature: profileContext?.signature || "Vivek",
-  };
-
-  // Sync saved likes/followers from localStorage on load
+  // Load saved username on client startup
   useEffect(() => {
-    const savedFollowers = localStorage.getItem("user_follower_count");
-    const savedLikes = localStorage.getItem("user_like_count");
-    const savedIsFollowing = localStorage.getItem("user_is_following");
-    const savedHasLiked = localStorage.getItem("user_has_liked");
-
-    if (savedFollowers !== null) setFollowerCount(parseInt(savedFollowers, 10));
-    if (savedLikes !== null) setLikeCount(parseInt(savedLikes, 10));
-    if (savedIsFollowing !== null) setIsFollowing(JSON.parse(savedIsFollowing));
-    if (savedHasLiked !== null) setHasLiked(JSON.parse(savedHasLiked));
+    const savedUsername = localStorage.getItem("user_unique_username");
+    if (savedUsername) setUsername(savedUsername);
   }, []);
 
-  const handleFollowToggle = () => {
-    const nextState = !isFollowing;
-    const nextCount = nextState
-      ? followerCount + 1
-      : Math.max(0, followerCount - 1);
-    setIsFollowing(nextState);
-    setFollowerCount(nextCount);
-    localStorage.setItem("user_is_following", JSON.stringify(nextState));
-    localStorage.setItem("user_follower_count", nextCount.toString());
+  // Listen for Navbar custom search event
+  useEffect(() => {
+    const handleSearchEvent = (e: CustomEvent) => {
+      const searched = e.detail;
+      setViewedUser(searched);
+    };
+
+    window.addEventListener("search-user-profile" as any, handleSearchEvent);
+    return () =>
+      window.removeEventListener(
+        "search-user-profile" as any,
+        handleSearchEvent,
+      );
+  }, []);
+
+  // handleSaveUsername is REMOVED from page.tsx
+
+  // Generate and Copy Direct Shareable HTTP Link
+  const handleCopyShareLink = () => {
+    if (typeof window !== "undefined") {
+      const currentHost = window.location.origin;
+      const targetUser = activeUsername;
+      const shareableLink = `${currentHost}/?user=${targetUser}`;
+      navigator.clipboard.writeText(shareableLink);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    }
   };
 
-  const handleLikeToggle = () => {
-    const nextState = !hasLiked;
-    const nextCount = nextState ? likeCount + 1 : Math.max(0, likeCount - 1);
-    setHasLiked(nextState);
-    setLikeCount(nextCount);
-    localStorage.setItem("user_has_liked", JSON.stringify(nextState));
-    localStorage.setItem("user_like_count", nextCount.toString());
+  // NEW function to copy username
+  const handleCopyUsername = () => {
+    if (typeof window !== "undefined") {
+      navigator.clipboard.writeText(activeUsername);
+      setCopiedUsername(true);
+      setTimeout(() => setCopiedUsername(false), 2000);
+    }
   };
+
+  // Determine active display states
+  const activeUserQuery = searchedUserFromUrl || viewedUser;
+  const activeName = activeUserQuery
+    ? activeUserQuery
+    : profileContext?.name || "Vivek Chaurasiya";
+  const activeUsername = activeUserQuery ? activeUserQuery : username;
+  const activeSignature = activeUserQuery
+    ? activeUserQuery
+    : profileContext?.signature || "Vivek";
+
+  // Check if viewing someone else's profile
+  const isViewingGuest = Boolean(activeUserQuery);
 
   return (
     <>
-      {/* Signature Intro Animation */}
       {isLoading && (
         <SignatureLoader
-          text={profile.name}
+          text={activeName}
           duration={2.5}
           onComplete={() => setIsLoading(false)}
         />
       )}
 
-      <main className="min-h-[calc(100vh-5rem)] pt-24 pb-12 flex items-center justify-center text-slate-900 dark:text-slate-100 transition-colors">
+      <main className="min-h-[calc(100vh-5rem)] pt-24 pb-12 flex items-center justify-center text-slate-900 dark:text-slate-100 transition-colors px-4">
         <div className="w-full max-w-6xl mx-auto bg-sky-100/60 dark:bg-slate-900/60 border border-sky-200/60 dark:border-slate-800 rounded-3xl overflow-hidden shadow-2xl transition-colors">
           <div className="grid grid-cols-1 lg:grid-cols-12 items-stretch min-h-[520px]">
             {/* LEFT COLUMN */}
             <div className="lg:col-span-7 p-8 sm:p-12 flex flex-col justify-between space-y-8">
               <div className="space-y-6">
                 <div className="space-y-1">
-                  <p className="text-xl sm:text-2xl font-medium text-slate-600 dark:text-slate-400">
-                    Hi, I'm
-                  </p>
-                  <h1 className="text-5xl sm:text-6xl md:text-7xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-                    {profile.name}
+                  <div className="flex items-center justify-between">
+                    <p className="text-xl sm:text-2xl font-medium text-slate-600 dark:text-slate-400">
+                      Hi, I'm
+                    </p>
+
+                    {/* Share Direct View-Only Link Button: ONLY for own profile */}
+                    {!isViewingGuest && (
+                      <button
+                        onClick={handleCopyShareLink}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/80 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-700 transition cursor-pointer shadow-xs"
+                        title="Copy Direct HTTP Link"
+                      >
+                        {copiedLink ? (
+                          <>
+                            <Check size={14} className="text-emerald-500" />
+                            <span className="text-emerald-500">
+                              Link Copied!
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <Share2 size={14} />
+                            <span>Share Link</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+
+                  <h1 className="text-5xl sm:text-6xl md:text-7xl font-extrabold capitalize text-slate-900 dark:text-white tracking-tight">
+                    {activeName}
                   </h1>
-                  <h2 className="text-2xl sm:text-3xl font-light text-slate-600 dark:text-slate-300 pt-1">
-                    {profile.role}
+
+                  {/* USERNAME COMPONENT (MODIFIED: Remove Edit, Add Copy) */}
+                  <div className="flex items-center gap-2 pt-1">
+                    <AtSign size={14} className="text-indigo-500" />
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono font-semibold text-indigo-600 dark:text-indigo-400">
+                        {activeUsername}
+                      </span>
+                      {/* Replace Edit button with Copy button */}
+                      <button
+                        onClick={handleCopyUsername}
+                        className="text-slate-400 hover:text-indigo-500 transition cursor-pointer"
+                        title={
+                          copiedUsername ? "Copied!" : "Copy Unique Username"
+                        }
+                      >
+                        {copiedUsername ? (
+                          <Check size={12} className="text-emerald-500" />
+                        ) : (
+                          <Copy size={12} />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <h2 className="text-2xl sm:text-3xl font-light text-slate-600 dark:text-slate-300 pt-2">
+                    {profileContext?.role ||
+                      "Full-Stack Developer & ECE Student"}
                   </h2>
                 </div>
 
@@ -110,44 +192,45 @@ export default function Home() {
                     About Myself
                   </h3>
                   <p className="text-sm sm:text-base text-slate-700 dark:text-slate-300 leading-relaxed max-w-xl">
-                    {profile.bio}
+                    {profileContext?.bio ||
+                      "Passionate developer crafting modern digital experiences."}
                   </p>
                 </div>
               </div>
 
-              {/* VIEWER ENGAGEMENT */}
+              {/* STATS & ENGAGEMENT */}
               <div className="pt-6 border-t border-slate-300/40 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-6">
                   <div className="flex items-center gap-2">
-                    <div className="p-2 rounded-xl bg-white/80 dark:bg-slate-800 shadow-sm text-sky-600 dark:text-sky-400">
+                    <div className="p-2 rounded-xl bg-white/80 dark:bg-slate-800 text-sky-600 dark:text-sky-400">
                       <Users size={18} />
                     </div>
                     <div>
                       <span className="text-base font-extrabold block leading-none">
                         {followerCount}
                       </span>
-                      <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      <span className="text-[10px] text-slate-500 uppercase tracking-wider">
                         Followers
                       </span>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <div className="p-2 rounded-xl bg-white/80 dark:bg-slate-800 shadow-sm text-indigo-600 dark:text-indigo-400">
+                    <div className="p-2 rounded-xl bg-white/80 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400">
                       <HeartHandshake size={18} />
                     </div>
                     <div>
                       <span className="text-base font-extrabold block leading-none">
                         {followingCount}
                       </span>
-                      <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      <span className="text-[10px] text-slate-500 uppercase tracking-wider">
                         Following
                       </span>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <div className="p-2 rounded-xl bg-white/80 dark:bg-slate-800 shadow-sm text-rose-500">
+                    <div className="p-2 rounded-xl bg-white/80 dark:bg-slate-800 text-rose-500">
                       <Heart
                         size={18}
                         className={hasLiked ? "fill-rose-500" : ""}
@@ -157,16 +240,20 @@ export default function Home() {
                       <span className="text-base font-extrabold block leading-none">
                         {likeCount}
                       </span>
-                      <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      <span className="text-[10px] text-slate-500 uppercase tracking-wider">
                         Likes
                       </span>
                     </div>
                   </div>
                 </div>
 
+                {/* Visitor Engagement Controls */}
                 <div className="flex gap-2">
                   <button
-                    onClick={handleFollowToggle}
+                    onClick={() => {
+                      setIsFollowing(!isFollowing);
+                      setFollowerCount((c) => (isFollowing ? c - 1 : c + 1));
+                    }}
                     className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition shadow-md cursor-pointer ${
                       isFollowing
                         ? "bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
@@ -174,22 +261,22 @@ export default function Home() {
                     }`}
                   >
                     {isFollowing ? (
-                      <>
-                        <UserCheck size={14} /> Following
-                      </>
+                      <UserCheck size={14} />
                     ) : (
-                      <>
-                        <UserPlus size={14} /> Follow
-                      </>
+                      <UserPlus size={14} />
                     )}
+                    <span>{isFollowing ? "Following" : "Follow"}</span>
                   </button>
 
                   <button
-                    onClick={handleLikeToggle}
-                    className={`p-2 rounded-xl transition shadow-md cursor-pointer border ${
+                    onClick={() => {
+                      setHasLiked(!hasLiked);
+                      setLikeCount((c) => (hasLiked ? c - 1 : c + 1));
+                    }}
+                    className={`p-2 rounded-xl transition shadow-md border cursor-pointer ${
                       hasLiked
                         ? "bg-rose-500 text-white border-rose-500"
-                        : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-rose-500 hover:bg-rose-50 dark:hover:bg-slate-700"
+                        : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-rose-500"
                     }`}
                   >
                     <Heart
@@ -204,8 +291,11 @@ export default function Home() {
             {/* RIGHT COLUMN */}
             <div className="lg:col-span-5 relative bg-sky-200/50 dark:bg-slate-800/50 flex items-center justify-center min-h-[380px] lg:min-h-full overflow-hidden">
               <img
-                src={profile.profileImg}
-                alt={profile.name}
+                src={
+                  profileContext?.profileImg ||
+                  "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=1000&auto=format&fit=crop"
+                }
+                alt={activeName}
                 className="w-full h-full object-cover object-center max-h-[550px] lg:max-h-full transition duration-500"
               />
               <div className="absolute bottom-4 right-4 bg-black/40 backdrop-blur-md px-5 py-2 rounded-2xl border border-white/20 text-right text-white shadow-xl pointer-events-none">
@@ -213,9 +303,9 @@ export default function Home() {
                   Verified Signature
                 </span>
                 <p
-                  className={`text-3xl font-normal drop-shadow-md select-none ${signatureFont.className}`}
+                  className={`text-3xl font-normal drop-shadow-md select-none capitalize ${signatureFont.className}`}
                 >
-                  {profile.signature}
+                  {activeSignature}
                 </p>
               </div>
             </div>

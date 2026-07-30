@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import {
   SignInButton,
   SignUpButton,
@@ -21,6 +21,7 @@ import {
   LogIn,
   UserPlus,
   Lock,
+  Search,
 } from "lucide-react";
 import HomeEditorModal from "./editor/HomeEditorModal";
 import ProjectsEditorModal from "./editor/ProjectsEditorModal";
@@ -31,8 +32,12 @@ import ResumeEditorModal, { ResumeData } from "./editor/ResumeEditorModal";
 
 export default function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [isProjectsDropdownOpen, setIsProjectsDropdownOpen] = useState(false);
+
+  // Search State
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Clerk Auth Hooks
   const { isSignedIn, isLoaded } = useUser();
@@ -53,6 +58,17 @@ export default function Navbar() {
     } else {
       action();
     }
+  };
+
+  // Search Submit Handler (Navigates to URL params to show view-only profile data)
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+
+    // Clean @ from username input
+    const cleanUsername = searchQuery.trim().replace(/^@/, "");
+    router.push(`/?user=${cleanUsername}`);
+    setSearchQuery("");
   };
 
   // Profile Links
@@ -172,114 +188,137 @@ export default function Navbar() {
   return (
     <>
       <nav className="fixed top-0 left-0 right-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 transition-colors">
-        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          {/* Top-Left Logo Dropdown Menu */}
-          <div className="relative" ref={menuRef}>
-            <button
-              onClick={() => setIsOpen(!isOpen)}
-              className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition flex items-center justify-center focus:outline-none cursor-pointer"
-            >
-              <svg
-                width="32"
-                height="32"
-                viewBox="0 0 100 100"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-                className="text-black dark:text-white fill-current transition"
+        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between gap-4">
+          {/* TOP-LEFT LOGO & USERNAME SEARCH BAR */}
+          <div className="flex items-center gap-3 sm:gap-4">
+            {/* Top-Left Logo Dropdown Menu */}
+            <div className="relative" ref={menuRef}>
+              <button
+                onClick={() => setIsOpen(!isOpen)}
+                className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition flex items-center justify-center focus:outline-none cursor-pointer"
               >
-                <path d="M 10 20 L 50 90 L 90 20 L 72 20 L 50 62 L 38 40 L 52 40 L 40 20 Z" />
-              </svg>
-            </button>
+                <svg
+                  width="32"
+                  height="32"
+                  viewBox="0 0 100 100"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="text-black dark:text-white fill-current transition"
+                >
+                  <path d="M 10 20 L 50 90 L 90 20 L 72 20 L 50 62 L 38 40 L 52 40 L 40 20 Z" />
+                </svg>
+              </button>
 
-            {/* Logo Options */}
-            {isOpen && (
-              <div className="absolute left-0 mt-2 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl py-2 z-50">
-                {pathname === "/resume" ? (
-                  <button
-                    onClick={() =>
-                      handleProtectedAction(() =>
-                        setIsResumeEditModalOpen(true),
-                      )
-                    }
-                    className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition text-left cursor-pointer"
-                  >
-                    <div className="flex items-center gap-3">
-                      <FileText
-                        size={16}
-                        className="text-indigo-600 dark:text-indigo-400"
-                      />
-                      <span>Edit Resume Content</span>
-                    </div>
-                    {!isSignedIn && (
-                      <Lock size={14} className="text-amber-500" />
-                    )}
-                  </button>
-                ) : pathname === "/projects" ? (
-                  <>
+              {/* Logo Options */}
+              {isOpen && (
+                <div className="absolute left-0 mt-2 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl py-2 z-50">
+                  {pathname === "/resume" ? (
                     <button
                       onClick={() =>
                         handleProtectedAction(() =>
-                          setIsAppShowcaseModalOpen(true),
+                          setIsResumeEditModalOpen(true),
                         )
                       }
                       className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition text-left cursor-pointer"
                     >
                       <div className="flex items-center gap-3">
-                        <Layers
+                        <FileText
                           size={16}
                           className="text-indigo-600 dark:text-indigo-400"
                         />
-                        <span>Edit Projects Showcase</span>
+                        <span>Edit Resume Content</span>
                       </div>
                       {!isSignedIn && (
                         <Lock size={14} className="text-amber-500" />
                       )}
                     </button>
+                  ) : pathname === "/projects" ? (
+                    <>
+                      <button
+                        onClick={() =>
+                          handleProtectedAction(() =>
+                            setIsAppShowcaseModalOpen(true),
+                          )
+                        }
+                        className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition text-left cursor-pointer"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Layers
+                            size={16}
+                            className="text-indigo-600 dark:text-indigo-400"
+                          />
+                          <span>Edit Projects Showcase</span>
+                        </div>
+                        {!isSignedIn && (
+                          <Lock size={14} className="text-amber-500" />
+                        )}
+                      </button>
+                      <button
+                        onClick={() =>
+                          handleProtectedAction(() =>
+                            setIsProjectsEditModalOpen(true),
+                          )
+                        }
+                        className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition text-left cursor-pointer"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Code2
+                            size={16}
+                            className="text-indigo-600 dark:text-indigo-400"
+                          />
+                          <span>Edit Developer Links</span>
+                        </div>
+                        {!isSignedIn && (
+                          <Lock size={14} className="text-amber-500" />
+                        )}
+                      </button>
+                    </>
+                  ) : (
                     <button
                       onClick={() =>
                         handleProtectedAction(() =>
-                          setIsProjectsEditModalOpen(true),
+                          setIsHomeEditModalOpen(true),
                         )
                       }
                       className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition text-left cursor-pointer"
                     >
                       <div className="flex items-center gap-3">
-                        <Code2
+                        <Edit3
                           size={16}
                           className="text-indigo-600 dark:text-indigo-400"
                         />
-                        <span>Edit Developer Links</span>
+                        <span>Edit Homepage Content</span>
                       </div>
                       {!isSignedIn && (
                         <Lock size={14} className="text-amber-500" />
                       )}
                     </button>
-                  </>
-                ) : (
-                  <button
-                    onClick={() =>
-                      handleProtectedAction(() => setIsHomeEditModalOpen(true))
-                    }
-                    className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition text-left cursor-pointer"
-                  >
-                    <div className="flex items-center gap-3">
-                      <Edit3
-                        size={16}
-                        className="text-indigo-600 dark:text-indigo-400"
-                      />
-                      <span>Edit Homepage Content</span>
-                    </div>
-                    {!isSignedIn && (
-                      <Lock size={14} className="text-amber-500" />
-                    )}
-                  </button>
-                )}
-              </div>
-            )}
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* SEARCH BAR (LOCATED JUST AFTER THE LOGO) */}
+            <form
+              onSubmit={handleSearchSubmit}
+              className="relative hidden sm:block w-44 md:w-60"
+            >
+              <input
+                type="text"
+                placeholder="Search @username..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-4 py-1.5 rounded-xl text-xs bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+              />
+              <Search
+                size={14}
+                className="absolute left-3 top-2.5 text-slate-400"
+              />
+            </form>
           </div>
 
-          {/* Top Right Navigation */}
-          <div className="flex gap-6 sm:gap-8 items-center font-medium text-slate-600 dark:text-slate-300 text-sm tracking-wide">
+          {/* TOP-RIGHT NAVIGATION & CLERK AUTH */}
+          <div className="flex gap-4 sm:gap-6 items-center font-medium text-slate-600 dark:text-slate-300 text-sm tracking-wide">
             <Link
               href="/"
               className="hover:text-black dark:hover:text-white transition"
@@ -380,7 +419,6 @@ export default function Navbar() {
             {/* SEPARATED LOG IN & SIGN UP BUTTONS */}
             {isLoaded && !isSignedIn && (
               <div className="flex items-center gap-2">
-                {/* 1. Log In Button (Ghost / Outline Style) */}
                 <SignInButton mode="modal">
                   <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold transition cursor-pointer border border-transparent hover:border-slate-300 dark:hover:border-slate-700">
                     <LogIn size={14} />
@@ -388,7 +426,6 @@ export default function Navbar() {
                   </button>
                 </SignInButton>
 
-                {/* 2. Sign Up Button (Primary Indigo Fill Style) */}
                 <SignUpButton mode="modal">
                   <button className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition shadow-sm cursor-pointer">
                     <UserPlus size={14} />

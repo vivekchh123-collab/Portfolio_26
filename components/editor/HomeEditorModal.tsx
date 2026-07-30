@@ -1,6 +1,7 @@
 "use client";
 
-import { X, Upload } from "lucide-react";
+import { useState } from "react"; // Add useState for modal username handling
+import { X, Upload, AtSign } from "lucide-react";
 import { useProfile } from "@/app/layout";
 
 interface HomeEditorModalProps {
@@ -24,6 +25,13 @@ export default function HomeEditorModal({
     signature,
     setSignature,
   } = useProfile();
+
+  // Load username into a local state within the modal for temporary editing
+  const [modalUsername, setModalUsername] = useState(() => {
+    return typeof window !== "undefined"
+      ? localStorage.getItem("user_unique_username") || "vivek_chaurasiya"
+      : "vivek_chaurasiya";
+  });
 
   if (!isOpen) return null;
 
@@ -81,6 +89,7 @@ export default function HomeEditorModal({
 
   const handleSave = () => {
     try {
+      // Save primary profile context data
       const profileData = {
         name,
         role,
@@ -89,6 +98,10 @@ export default function HomeEditorModal({
         signature,
       };
       localStorage.setItem("user_profile_data", JSON.stringify(profileData));
+
+      // NEW: Save the Unique Username separately
+      localStorage.setItem("user_unique_username", modalUsername.trim());
+
       window.dispatchEvent(new Event("profile-updated"));
     } catch (e) {
       console.error("Failed to save profile to localStorage", e);
@@ -111,6 +124,21 @@ export default function HomeEditorModal({
         </h2>
 
         <div className="space-y-3">
+          {/* EDIT UNIQUE USERNAME (@) */}
+          <div>
+            <label className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
+              <AtSign size={14} className="text-indigo-500" />
+              Unique Username (@)
+            </label>
+            <input
+              type="text"
+              value={modalUsername}
+              onChange={(e) => setModalUsername(e.target.value)}
+              className="w-full mt-1 p-2.5 border rounded-lg text-sm bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 font-mono text-indigo-400 focus:outline-none"
+              placeholder="unique_handle"
+            />
+          </div>
+
           <div>
             <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">
               Full Name
