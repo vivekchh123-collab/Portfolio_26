@@ -84,8 +84,8 @@ export default function ResumePage() {
 
   const [resumeData, setResumeData] = useState<ResumeData>(defaultResume);
 
-  // Fetch resume data from Supabase
-  const loadResumeData = async () => {
+  // Fetch resume data directly from Supabase
+  const loadResumeDataFromSupabase = async () => {
     if (!user) return;
 
     try {
@@ -95,7 +95,12 @@ export default function ResumePage() {
         .eq("user_id", user.id)
         .single();
 
-      if (data?.resume_data && typeof data.resume_data === "object" && !error) {
+      if (
+        data?.resume_data &&
+        typeof data.resume_data === "object" &&
+        Object.keys(data.resume_data).length > 0 &&
+        !error
+      ) {
         setResumeData(data.resume_data as ResumeData);
       }
     } catch (e) {
@@ -104,15 +109,15 @@ export default function ResumePage() {
   };
 
   useEffect(() => {
-    loadResumeData();
+    loadResumeDataFromSupabase();
 
     const handleOpenEditor = () => setIsEditorOpen(true);
     window.addEventListener("open-resume-editor", handleOpenEditor);
-    window.addEventListener("resume-updated", loadResumeData);
+    window.addEventListener("resume-updated", loadResumeDataFromSupabase);
 
     return () => {
       window.removeEventListener("open-resume-editor", handleOpenEditor);
-      window.removeEventListener("resume-updated", loadResumeData);
+      window.removeEventListener("resume-updated", loadResumeDataFromSupabase);
     };
   }, [user]);
 
@@ -200,7 +205,7 @@ export default function ResumePage() {
               : ""
           }`}
         >
-          {/* LEFT SIDEBAR */}
+          {/* LEFT SIDEBAR (BLUSH PINK) */}
           <div className="md:col-span-5 bg-[#f3e5e3] p-8 flex flex-col gap-8 border-r border-slate-200/50">
             {/* Photo Box */}
             {resumeData?.photoUrl && (
@@ -252,7 +257,7 @@ export default function ResumePage() {
                   </p>
                 )}
 
-                {/* Dynamic Social Media Links */}
+                {/* Render Dynamic Social Media Links */}
                 {resumeData?.socials && resumeData.socials.length > 0 && (
                   <div className="pt-2 border-t border-[#e2cac7] space-y-2">
                     {resumeData.socials.map((social) => {
@@ -309,7 +314,7 @@ export default function ResumePage() {
             )}
           </div>
 
-          {/* RIGHT CONTENT */}
+          {/* RIGHT CONTENT (WHITE) */}
           <div className="md:col-span-7 p-10 bg-white flex flex-col gap-8 justify-between">
             {/* Header / Name */}
             <div className="space-y-1 pt-4">
