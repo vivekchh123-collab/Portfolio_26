@@ -1,6 +1,9 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { X, Code2, HelpCircle, ExternalLink } from "lucide-react";
+import { useUser } from "@clerk/nextjs";
+import { supabase } from "@/lib/supabaseClient";
 
 interface ProjectsEditorModalProps {
   isOpen: boolean;
@@ -19,7 +22,66 @@ export default function ProjectsEditorModal({
   leetcodeUrl,
   setLeetcodeUrl,
 }: ProjectsEditorModalProps) {
+  const { user } = useUser();
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Sync developer links directly from Supabase when modal opens
+  useEffect(() => {
+    if (isOpen && user) {
+      async function fetchDevLinks() {
+        const { data } = await supabase
+          .from("profiles")
+          .select("github_url, leetcode_url")
+          .eq("user_id", user?.id)
+          .single();
+
+        if (data) {
+          if (data.github_url) setGithubUrl(data.github_url);
+          if (data.leetcode_url) setLeetcodeUrl(data.leetcode_url);
+        }
+      }
+
+      fetchDevLinks();
+    }
+  }, [isOpen, user, setGithubUrl, setLeetcodeUrl]);
+
   if (!isOpen) return null;
+
+  const handleSave = async () => {
+    if (!user) {
+      alert("You must be logged in to save developer links.");
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      // Upsert GitHub and LeetCode URLs directly to Supabase tied to user.id
+      const { error } = await supabase.from("profiles").upsert(
+        {
+          user_id: user.id,
+          github_url: githubUrl.trim(),
+          leetcode_url: leetcodeUrl.trim(),
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id" },
+      );
+
+      if (error) {
+        console.error("Supabase Save Error:", error.message);
+        alert("Failed to save developer links to database.");
+      } else {
+        // Broadcast custom event so parent components re-fetch updated links
+        window.dispatchEvent(new Event("developer-links-updated"));
+        onClose();
+      }
+    } catch (error) {
+      console.error("Storage Error:", error);
+      alert("An unexpected error occurred while saving.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 pt-24">
@@ -135,10 +197,11 @@ export default function ProjectsEditorModal({
         </div>
 
         <button
-          onClick={onClose}
-          className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl text-sm transition mt-2 cursor-pointer shadow-lg"
+          onClick={handleSave}
+          disabled={isSaving}
+          className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl text-sm transition mt-2 cursor-pointer shadow-lg disabled:opacity-50"
         >
-          Save & Apply Links
+          {isSaving ? "Saving to Database..." : "Save & Apply Links"}
         </button>
       </div>
     </div>

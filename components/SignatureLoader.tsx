@@ -2,6 +2,8 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
+import { useUser } from "@clerk/nextjs";
+import { supabase } from "@/lib/supabaseClient";
 
 interface SignatureLoaderProps {
   /** The signature text or brand name to draw */
@@ -17,7 +19,30 @@ export default function SignatureLoader({
   duration = 2.5,
   onComplete,
 }: SignatureLoaderProps) {
+  const { user } = useUser();
   const [isVisible, setIsVisible] = useState(true);
+  const [displayText, setDisplayText] = useState(text);
+
+  // Fetch the user's saved full name or signature from Supabase if available
+  useEffect(() => {
+    async function fetchSignatureName() {
+      if (user) {
+        const { data } = await supabase
+          .from("profiles")
+          .select("name, signature")
+          .eq("user_id", user.id)
+          .single();
+
+        if (data?.name) {
+          setDisplayText(data.name);
+        } else if (data?.signature) {
+          setDisplayText(data.signature);
+        }
+      }
+    }
+
+    fetchSignatureName();
+  }, [user]);
 
   useEffect(() => {
     // Total display time: draw duration + brief delay before fading out
@@ -100,7 +125,7 @@ export default function SignatureLoader({
                   },
                 }}
               >
-                {text}
+                {displayText}
               </motion.text>
             </svg>
 

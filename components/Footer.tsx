@@ -2,15 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import {
-  X,
-  ShieldCheck,
-  FileText,
-  Lock,
-  Activity,
-  BookOpen,
-  Mail,
-} from "lucide-react";
+import { X, ShieldCheck, FileText, Lock, Activity, Mail } from "lucide-react";
 
 export default function Footer() {
   const [activeModal, setActiveModal] = useState<string | null>(null);
@@ -127,10 +119,10 @@ export default function Footer() {
                   <Lock size={20} /> Privacy & Data Policy
                 </div>
                 <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                  ViHub respects user privacy. No personal identification data
-                  is stored or transmitted without your direct consent. Local
-                  browser storage is strictly used for client-side state
-                  persistence.
+                  ViHub respects user privacy. Profile data, showcase items, and
+                  resume configurations are securely managed via Supabase and
+                  Clerk authentication. No personal data is shared with third
+                  parties without your direct consent.
                 </p>
               </div>
             )}
@@ -142,9 +134,9 @@ export default function Footer() {
                 </div>
                 <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
                   Our platform utilizes standard Next.js security headers,
-                  modern encryption practices, and client-side password
-                  protection for sensitive content like protected resume
-                  details.
+                  Row-Level Security (RLS) policies on Supabase, encrypted Clerk
+                  session tokens, and password protection for sensitive resume
+                  content.
                 </p>
               </div>
             )}

@@ -1,6 +1,9 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { X, Upload, Key, Plus, Trash2, Share2 } from "lucide-react";
+import { useUser } from "@clerk/nextjs";
+import { supabase } from "@/lib/supabaseClient";
 
 export interface SocialLink {
   id: string;
@@ -42,6 +45,28 @@ export default function ResumeEditorModal({
   resumeData,
   setResumeData,
 }: ResumeEditorModalProps) {
+  const { user } = useUser();
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Sync resume data directly from Supabase when modal opens
+  useEffect(() => {
+    if (isOpen && user) {
+      async function fetchResumeData() {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("resume_data")
+          .eq("user_id", user?.id)
+          .single();
+
+        if (data?.resume_data && typeof data.resume_data === "object") {
+          setResumeData(data.resume_data as ResumeData);
+        }
+      }
+
+      fetchResumeData();
+    }
+  }, [isOpen, user, setResumeData]);
+
   if (!isOpen) return null;
 
   // Image Upload Handler
@@ -155,17 +180,38 @@ export default function ResumeEditorModal({
     }));
   };
 
-  // Save to LocalStorage & Sync state
-  const handleSave = () => {
+  // Save to Supabase tied to Clerk user.id
+  const handleSave = async () => {
+    if (!user) {
+      alert("You must be logged in to save resume data.");
+      return;
+    }
+
+    setIsSaving(true);
+
     try {
-      if (resumeData) {
-        localStorage.setItem("user_resume_data", JSON.stringify(resumeData));
+      const { error } = await supabase.from("profiles").upsert(
+        {
+          user_id: user.id,
+          resume_data: resumeData,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id" },
+      );
+
+      if (error) {
+        console.error("Supabase Save Error:", error.message);
+        alert("Failed to save resume changes to database.");
+      } else {
         window.dispatchEvent(new Event("resume-updated"));
+        onClose();
       }
     } catch (e) {
-      console.error("Failed to save resume to localStorage", e);
+      console.error("Failed to save resume:", e);
+      alert("An unexpected error occurred while saving.");
+    } finally {
+      setIsSaving(false);
     }
-    onClose();
   };
 
   return (
@@ -574,9 +620,10 @@ export default function ResumeEditorModal({
         {/* Save Button */}
         <button
           onClick={handleSave}
-          className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg text-sm transition mt-4 cursor-pointer"
+          disabled={isSaving}
+          className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg text-sm transition mt-4 cursor-pointer disabled:opacity-50"
         >
-          Save Resume Changes
+          {isSaving ? "Saving to Database..." : "Save Resume Changes"}
         </button>
       </div>
     </div>

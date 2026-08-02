@@ -12,6 +12,8 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { Great_Vibes } from "next/font/google";
+import { useUser } from "@clerk/nextjs";
+import { supabase } from "@/lib/supabaseClient";
 import ResumeEditorModal, {
   ResumeData,
 } from "@/components/editor/ResumeEditorModal";
@@ -23,6 +25,7 @@ const signatureFont = Great_Vibes({
 });
 
 export default function ResumePage() {
+  const { user } = useUser();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [passwordInput, setPasswordInput] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
@@ -79,43 +82,39 @@ export default function ResumePage() {
     ],
   };
 
-  // 1. Initialize state with default data to match server HTML output
   const [resumeData, setResumeData] = useState<ResumeData>(defaultResume);
 
-  // 2. Safely sync from localStorage inside useEffect AFTER initial hydration
-  useEffect(() => {
-    const saved = localStorage.getItem("user_resume_data");
-    if (saved) {
-      try {
-        setResumeData(JSON.parse(saved));
-      } catch (e) {
-        console.error("Failed to parse resume data from localStorage", e);
+  // Fetch resume data from Supabase
+  const loadResumeData = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("resume_data")
+        .eq("user_id", user.id)
+        .single();
+
+      if (data?.resume_data && typeof data.resume_data === "object" && !error) {
+        setResumeData(data.resume_data as ResumeData);
       }
+    } catch (e) {
+      console.error("Failed to load resume data from Supabase", e);
     }
-  }, []);
+  };
 
-  // 3. Listen for custom editor updates and menu triggers
   useEffect(() => {
-    const handleOpenEditor = () => setIsEditorOpen(true);
-    const handleStorageUpdate = () => {
-      const saved = localStorage.getItem("user_resume_data");
-      if (saved) {
-        try {
-          setResumeData(JSON.parse(saved));
-        } catch (e) {
-          console.error("Failed to sync resume update", e);
-        }
-      }
-    };
+    loadResumeData();
 
+    const handleOpenEditor = () => setIsEditorOpen(true);
     window.addEventListener("open-resume-editor", handleOpenEditor);
-    window.addEventListener("resume-updated", handleStorageUpdate);
+    window.addEventListener("resume-updated", loadResumeData);
 
     return () => {
       window.removeEventListener("open-resume-editor", handleOpenEditor);
-      window.removeEventListener("resume-updated", handleStorageUpdate);
+      window.removeEventListener("resume-updated", loadResumeData);
     };
-  }, []);
+  }, [user]);
 
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -201,7 +200,7 @@ export default function ResumePage() {
               : ""
           }`}
         >
-          {/* LEFT SIDEBAR (BLUSH PINK) */}
+          {/* LEFT SIDEBAR */}
           <div className="md:col-span-5 bg-[#f3e5e3] p-8 flex flex-col gap-8 border-r border-slate-200/50">
             {/* Photo Box */}
             {resumeData?.photoUrl && (
@@ -253,7 +252,7 @@ export default function ResumePage() {
                   </p>
                 )}
 
-                {/* Render Dynamic Social Media Links */}
+                {/* Dynamic Social Media Links */}
                 {resumeData?.socials && resumeData.socials.length > 0 && (
                   <div className="pt-2 border-t border-[#e2cac7] space-y-2">
                     {resumeData.socials.map((social) => {
@@ -310,7 +309,7 @@ export default function ResumePage() {
             )}
           </div>
 
-          {/* RIGHT CONTENT (WHITE) */}
+          {/* RIGHT CONTENT */}
           <div className="md:col-span-7 p-10 bg-white flex flex-col gap-8 justify-between">
             {/* Header / Name */}
             <div className="space-y-1 pt-4">

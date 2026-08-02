@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Great_Vibes } from "next/font/google";
 import { useProfile } from "./layout";
+import { supabase } from "@/lib/supabaseClient";
 import SignatureLoader from "@/components/SignatureLoader";
 
 // Force Next.js to dynamically render this page instead of static pre-rendering
@@ -29,7 +30,7 @@ const signatureFont = Great_Vibes({
 
 function HomeContent() {
   const profileContext = useProfile();
-  const { isSignedIn } = useUser();
+  const { user, isSignedIn } = useUser();
   const searchParams = useSearchParams();
 
   // Read ?user= parameter from URL
@@ -37,7 +38,7 @@ function HomeContent() {
 
   const [isLoading, setIsLoading] = useState(true);
 
-  // Editable Username State (Saved in LocalStorage / Live DB)
+  // Username State
   const [username, setUsername] = useState("vivek_chaurasiya");
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedUsername, setCopiedUsername] = useState(false);
@@ -45,18 +46,53 @@ function HomeContent() {
   // View Mode: Viewing Own Profile vs Visitor Search
   const [viewedUser, setViewedUser] = useState<string | null>(null);
 
-  // Engagement States: All start at ZERO
+  // Engagement States
   const [isFollowing, setIsFollowing] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const [likeCount, setLikeCount] = useState(0);
   const [hasLiked, setHasLiked] = useState(false);
 
-  // Load saved username on client startup
+  // Fetch user profile data directly from Supabase
+  const fetchProfileFromDatabase = async () => {
+    if (!isSignedIn || !user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("user_id", user.id)
+        .single();
+
+      if (data && !error) {
+        if (data.username) setUsername(data.username);
+        if (data.name && profileContext?.setName)
+          profileContext.setName(data.name);
+        if (data.role && profileContext?.setRole)
+          profileContext.setRole(data.role);
+        if (data.bio && profileContext?.setBio) profileContext.setBio(data.bio);
+        if (data.signature && profileContext?.setSignature)
+          profileContext.setSignature(data.signature);
+        if (data.profile_img && profileContext?.setProfileImg)
+          profileContext.setProfileImg(data.profile_img);
+        if (typeof data.follower_count === "number")
+          setFollowerCount(data.follower_count);
+        if (typeof data.following_count === "number")
+          setFollowingCount(data.following_count);
+        if (typeof data.like_count === "number") setLikeCount(data.like_count);
+      }
+    } catch (e) {
+      console.error("Failed to load profile from database", e);
+    }
+  };
+
   useEffect(() => {
-    const savedUsername = localStorage.getItem("user_unique_username");
-    if (savedUsername) setUsername(savedUsername);
-  }, []);
+    fetchProfileFromDatabase();
+
+    window.addEventListener("profile-updated", fetchProfileFromDatabase);
+    return () =>
+      window.removeEventListener("profile-updated", fetchProfileFromDatabase);
+  }, [user, isSignedIn]);
 
   // Listen for Navbar custom search event
   useEffect(() => {

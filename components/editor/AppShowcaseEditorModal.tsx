@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { X, Plus, Trash2, Upload, Layers, RefreshCw } from "lucide-react";
+import { useUser } from "@clerk/nextjs";
+import { supabase } from "@/lib/supabaseClient";
 
 export interface ProjectItem {
   id: string;
@@ -25,6 +27,9 @@ export default function AppShowcaseEditorModal({
   projects: externalProjects,
   setProjects: externalSetProjects,
 }: AppShowcaseEditorModalProps) {
+  const { user } = useUser();
+  const [isSaving, setIsSaving] = useState(false);
+
   const defaultProjects: ProjectItem[] = [
     {
       id: "1",
@@ -40,26 +45,31 @@ export default function AppShowcaseEditorModal({
   const [localProjects, setLocalProjects] =
     useState<ProjectItem[]>(defaultProjects);
 
-  // Sync projects with localStorage on mount/open
+  // Sync projects with Supabase on mount/open
   useEffect(() => {
-    if (isOpen) {
-      const saved = localStorage.getItem("user_projects_data");
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setLocalProjects(parsed);
-            return;
-          }
-        } catch (e) {
-          console.error("Failed to parse projects from localStorage", e);
+    if (isOpen && user) {
+      async function fetchUserProjects() {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("projects")
+          .eq("user_id", user?.id)
+          .single();
+
+        if (
+          data?.projects &&
+          Array.isArray(data.projects) &&
+          data.projects.length > 0
+        ) {
+          setLocalProjects(data.projects);
+          if (externalSetProjects) externalSetProjects(data.projects);
+        } else if (externalProjects && externalProjects.length > 0) {
+          setLocalProjects(externalProjects);
         }
       }
-      if (externalProjects && externalProjects.length > 0) {
-        setLocalProjects(externalProjects);
-      }
+
+      fetchUserProjects();
     }
-  }, [isOpen]);
+  }, [isOpen, user]);
 
   if (!isOpen) return null;
 
@@ -173,15 +183,38 @@ export default function AppShowcaseEditorModal({
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (!user) {
+      alert("You must be logged in to save projects.");
+      return;
+    }
+
+    setIsSaving(true);
+
     try {
-      localStorage.setItem("user_projects_data", JSON.stringify(localProjects));
-      window.dispatchEvent(new Event("projects-updated"));
+      // Save projects directly to Supabase tied to user.id
+      const { error } = await supabase.from("profiles").upsert(
+        {
+          user_id: user.id,
+          projects: localProjects,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id" },
+      );
+
+      if (error) {
+        console.error("Supabase Save Error:", error.message);
+        alert("Failed to save applications showcase to database.");
+      } else {
+        window.dispatchEvent(new Event("projects-updated"));
+        onClose();
+      }
     } catch (error) {
       console.error("Storage Error:", error);
-      alert("Failed to save. Images may be too large for browser storage.");
+      alert("An unexpected error occurred while saving.");
+    } finally {
+      setIsSaving(false);
     }
-    onClose();
   };
 
   return (
@@ -363,9 +396,10 @@ export default function AppShowcaseEditorModal({
 
         <button
           onClick={handleSave}
-          className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl text-sm transition mt-2 cursor-pointer shadow-lg"
+          disabled={isSaving}
+          className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl text-sm transition mt-2 cursor-pointer shadow-lg disabled:opacity-50"
         >
-          Save Application Showcase
+          {isSaving ? "Saving to Database..." : "Save Application Showcase"}
         </button>
       </div>
     </div>

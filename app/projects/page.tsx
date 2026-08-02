@@ -14,6 +14,8 @@ import {
   ChevronRight,
   Maximize2,
 } from "lucide-react";
+import { useUser } from "@clerk/nextjs";
+import { supabase } from "@/lib/supabaseClient";
 import AppShowcaseEditorModal, {
   ProjectItem,
 } from "@/components/editor/AppShowcaseEditorModal";
@@ -26,6 +28,7 @@ interface Comment {
 }
 
 export default function ProjectsPage() {
+  const { user } = useUser();
   const [isEditorOpen, setIsEditorOpen] = useState(false);
 
   // Engagement States per Project
@@ -75,42 +78,70 @@ export default function ProjectsPage() {
 
   const [projects, setProjects] = useState<ProjectItem[]>(defaultProjects);
 
-  // Load Saved Projects, Likes, & Comments from LocalStorage
-  useEffect(() => {
-    const loadProjects = () => {
-      const savedProjects = localStorage.getItem("user_projects_data");
-      if (savedProjects) {
-        try {
-          const parsed = JSON.parse(savedProjects);
-          if (Array.isArray(parsed) && parsed.length > 0) setProjects(parsed);
-        } catch (e) {
-          console.error("Failed to load projects", e);
+  // Fetch Projects and Engagements from Supabase
+  const loadProjectsData = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select(
+          "projects, project_likes_map, project_user_likes_map, project_comments_map",
+        )
+        .eq("user_id", user.id)
+        .single();
+
+      if (data && !error) {
+        if (
+          data.projects &&
+          Array.isArray(data.projects) &&
+          data.projects.length > 0
+        ) {
+          setProjects(data.projects);
         }
+        if (data.project_likes_map) setLikesMap(data.project_likes_map);
+        if (data.project_user_likes_map)
+          setUserLikesMap(data.project_user_likes_map);
+        if (data.project_comments_map)
+          setCommentsMap(data.project_comments_map);
       }
+    } catch (e) {
+      console.error("Failed to load project data from Supabase", e);
+    }
+  };
 
-      const savedLikes = localStorage.getItem("user_project_likes_map");
-      if (savedLikes) setLikesMap(JSON.parse(savedLikes));
-
-      const savedUserLikes = localStorage.getItem(
-        "user_project_user_likes_map",
-      );
-      if (savedUserLikes) setUserLikesMap(JSON.parse(savedUserLikes));
-
-      const savedComments = localStorage.getItem("user_project_comments_map");
-      if (savedComments) setCommentsMap(JSON.parse(savedComments));
-    };
-
-    loadProjects();
+  useEffect(() => {
+    loadProjectsData();
 
     const handleOpenEditor = () => setIsEditorOpen(true);
     window.addEventListener("open-projects-editor", handleOpenEditor);
-    window.addEventListener("projects-updated", loadProjects);
+    window.addEventListener("projects-updated", loadProjectsData);
 
     return () => {
       window.removeEventListener("open-projects-editor", handleOpenEditor);
-      window.removeEventListener("projects-updated", loadProjects);
+      window.removeEventListener("projects-updated", loadProjectsData);
     };
-  }, []);
+  }, [user]);
+
+  // Save Engagements to Supabase
+  const syncEngagementsToSupabase = async (
+    updatedLikes: Record<string, number>,
+    updatedUserLikes: Record<string, boolean>,
+    updatedComments: Record<string, Comment[]>,
+  ) => {
+    if (!user) return;
+
+    await supabase.from("profiles").upsert(
+      {
+        user_id: user.id,
+        project_likes_map: updatedLikes,
+        project_user_likes_map: updatedUserLikes,
+        project_comments_map: updatedComments,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id" },
+    );
+  };
 
   // Handle Like Toggle
   const handleLikeToggle = (projectId: string) => {
@@ -128,13 +159,10 @@ export default function ProjectsPage() {
     setLikesMap(updatedLikesMap);
     setUserLikesMap(updatedUserLikesMap);
 
-    localStorage.setItem(
-      "user_project_likes_map",
-      JSON.stringify(updatedLikesMap),
-    );
-    localStorage.setItem(
-      "user_project_user_likes_map",
-      JSON.stringify(updatedUserLikesMap),
+    syncEngagementsToSupabase(
+      updatedLikesMap,
+      updatedUserLikesMap,
+      commentsMap,
     );
   };
 
@@ -155,10 +183,7 @@ export default function ProjectsPage() {
     const updatedCommentsMap = { ...commentsMap, [projectId]: updatedComments };
 
     setCommentsMap(updatedCommentsMap);
-    localStorage.setItem(
-      "user_project_comments_map",
-      JSON.stringify(updatedCommentsMap),
-    );
+    syncEngagementsToSupabase(likesMap, userLikesMap, updatedCommentsMap);
 
     setCommentInput("");
   };
@@ -278,7 +303,7 @@ export default function ProjectsPage() {
                     </div>
                   </div>
 
-                  {/* THUMBNAIL IMAGE SWITCHER (IF MULTIPLE IMAGES EXIST) */}
+                  {/* THUMBNAIL IMAGE SWITCHER */}
                   {images.length > 1 && (
                     <div className="flex items-center gap-3 overflow-x-auto pb-1 pt-1">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
@@ -334,7 +359,7 @@ export default function ProjectsPage() {
                     </div>
                   )}
 
-                  {/* INTERACTIVE ACTIONS BAR: LIKES, COMMENTS & SHARE */}
+                  {/* INTERACTIVE ACTIONS BAR */}
                   <div className="pt-4 border-t border-slate-300/40 dark:border-slate-800 flex items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
                       {/* LIKE BUTTON */}
@@ -471,7 +496,7 @@ export default function ProjectsPage() {
         </div>
       </div>
 
-      {/* --- FULLSCREEN LIGHTBOX MODAL (ZERO IMAGE BLOCKS / OVERLAPS) --- */}
+      {/* --- FULLSCREEN LIGHTBOX MODAL --- */}
       {lightboxState.isOpen && activeLightboxProject && (
         <div
           onClick={() =>
@@ -479,7 +504,7 @@ export default function ProjectsPage() {
           }
           className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-md flex flex-col justify-between p-4 sm:p-6 animate-in fade-in duration-200 select-none overflow-hidden"
         >
-          {/* TOP HEADER BAR (ROW 1 - OUTSIDE IMAGE AREA) */}
+          {/* TOP HEADER BAR */}
           <div
             onClick={(e) => e.stopPropagation()}
             className="w-full flex justify-between items-center bg-slate-900/90 border border-slate-800 px-5 py-3 rounded-2xl text-white max-w-6xl mx-auto shadow-2xl shrink-0"
@@ -508,7 +533,7 @@ export default function ProjectsPage() {
             </button>
           </div>
 
-          {/* MAIN IMAGE CONTAINER (ROW 2 - FLEX-1 HEIGHT WITH OBJECT-CONTAIN) */}
+          {/* MAIN IMAGE CONTAINER */}
           <div
             onClick={(e) => e.stopPropagation()}
             className="relative flex-1 w-full max-w-6xl mx-auto my-3 flex items-center justify-center overflow-hidden"
@@ -530,7 +555,7 @@ export default function ProjectsPage() {
               </button>
             )}
 
-            {/* Completely Unblocked Full Image */}
+            {/* Full Image */}
             <img
               src={activeLightboxImages[lightboxState.imageIndex]}
               alt={activeLightboxProject.name}
@@ -554,7 +579,7 @@ export default function ProjectsPage() {
             )}
           </div>
 
-          {/* BOTTOM THUMBNAILS BAR (ROW 3 - OUTSIDE IMAGE AREA) */}
+          {/* BOTTOM THUMBNAILS BAR */}
           {activeLightboxImages.length > 1 ? (
             <div
               onClick={(e) => e.stopPropagation()}

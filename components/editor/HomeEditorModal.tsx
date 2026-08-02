@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react"; // Add useState for modal username handling
+import { useState, useEffect } from "react";
 import { X, Upload, AtSign } from "lucide-react";
+import { useUser } from "@clerk/nextjs";
 import { useProfile } from "@/app/layout";
+import { supabase } from "@/lib/supabaseClient";
 
 interface HomeEditorModalProps {
   isOpen: boolean;
@@ -13,6 +15,7 @@ export default function HomeEditorModal({
   isOpen,
   onClose,
 }: HomeEditorModalProps) {
+  const { user } = useUser();
   const {
     name,
     setName,
@@ -26,12 +29,24 @@ export default function HomeEditorModal({
     setSignature,
   } = useProfile();
 
-  // Load username into a local state within the modal for temporary editing
-  const [modalUsername, setModalUsername] = useState(() => {
-    return typeof window !== "undefined"
-      ? localStorage.getItem("user_unique_username") || "vivek_chaurasiya"
-      : "vivek_chaurasiya";
-  });
+  const [modalUsername, setModalUsername] = useState("vivek_chaurasiya");
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Fetch saved username directly from Supabase when modal opens
+  useEffect(() => {
+    if (user) {
+      async function loadUsername() {
+        const { data } = await supabase
+          .from("profiles")
+          .select("username")
+          .eq("user_id", user?.id)
+          .single();
+
+        if (data?.username) setModalUsername(data.username);
+      }
+      loadUsername();
+    }
+  }, [user]);
 
   if (!isOpen) return null;
 
@@ -87,26 +102,43 @@ export default function HomeEditorModal({
     }
   };
 
-  const handleSave = () => {
-    try {
-      // Save primary profile context data
-      const profileData = {
-        name,
-        role,
-        bio,
-        profileImg,
-        signature,
-      };
-      localStorage.setItem("user_profile_data", JSON.stringify(profileData));
-
-      // NEW: Save the Unique Username separately
-      localStorage.setItem("user_unique_username", modalUsername.trim());
-
-      window.dispatchEvent(new Event("profile-updated"));
-    } catch (e) {
-      console.error("Failed to save profile to localStorage", e);
+  const handleSave = async () => {
+    if (!user) {
+      alert("You must be logged in to save changes.");
+      return;
     }
-    onClose();
+
+    setIsSaving(true);
+
+    try {
+      // Upsert profile data directly to Supabase using Clerk user.id
+      const { error } = await supabase.from("profiles").upsert(
+        {
+          user_id: user.id,
+          username: modalUsername.trim(),
+          name,
+          role,
+          bio,
+          signature,
+          profile_img: profileImg,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id" },
+      );
+
+      if (error) {
+        console.error("Supabase Save Error:", error.message);
+        alert("Failed to save changes to database.");
+      } else {
+        // Broadcast custom event so app/page.tsx re-fetches updated data
+        window.dispatchEvent(new Event("profile-updated"));
+        onClose();
+      }
+    } catch (e) {
+      console.error("Failed to save profile:", e);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -222,9 +254,10 @@ export default function HomeEditorModal({
 
         <button
           onClick={handleSave}
-          className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg text-sm transition mt-2 cursor-pointer"
+          disabled={isSaving}
+          className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg text-sm transition mt-2 cursor-pointer disabled:opacity-50"
         >
-          Save Changes
+          {isSaving ? "Saving to Database..." : "Save Changes"}
         </button>
       </div>
     </div>

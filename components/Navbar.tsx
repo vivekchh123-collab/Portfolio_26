@@ -23,6 +23,7 @@ import {
   Lock,
   Search,
 } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
 import HomeEditorModal from "./editor/HomeEditorModal";
 import ProjectsEditorModal from "./editor/ProjectsEditorModal";
 import AppShowcaseEditorModal, {
@@ -40,7 +41,7 @@ export default function Navbar() {
   const [searchQuery, setSearchQuery] = useState("");
 
   // Clerk Auth Hooks
-  const { isSignedIn, isLoaded } = useUser();
+  const { user, isSignedIn, isLoaded } = useUser();
   const { openSignIn } = useClerk();
 
   // Editor Modal States
@@ -92,20 +93,7 @@ export default function Navbar() {
     },
   ];
 
-  const [projects, setProjects] = useState<ProjectItem[]>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("user_projects_data");
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-        } catch (e) {
-          console.error(e);
-        }
-      }
-    }
-    return defaultProjects;
-  });
+  const [projects, setProjects] = useState<ProjectItem[]>(defaultProjects);
 
   // Default Resume Fallback
   const defaultResume: ResumeData = {
@@ -124,19 +112,51 @@ export default function Navbar() {
     education: [],
   };
 
-  const [resumeData, setResumeData] = useState<ResumeData>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("user_resume_data");
-      if (saved) {
-        try {
-          return JSON.parse(saved);
-        } catch (e) {
-          console.error(e);
+  const [resumeData, setResumeData] = useState<ResumeData>(defaultResume);
+
+  // Sync profile data directly from Supabase
+  const loadSupabaseData = async () => {
+    if (!isSignedIn || !user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("github_url, leetcode_url, projects, resume_data")
+        .eq("user_id", user.id)
+        .single();
+
+      if (data && !error) {
+        if (data.github_url) setGithubUrl(data.github_url);
+        if (data.leetcode_url) setLeetcodeUrl(data.leetcode_url);
+        if (
+          data.projects &&
+          Array.isArray(data.projects) &&
+          data.projects.length > 0
+        ) {
+          setProjects(data.projects);
+        }
+        if (data.resume_data && typeof data.resume_data === "object") {
+          setResumeData(data.resume_data as ResumeData);
         }
       }
+    } catch (e) {
+      console.error("Failed to load Navbar data from Supabase", e);
     }
-    return defaultResume;
-  });
+  };
+
+  useEffect(() => {
+    loadSupabaseData();
+
+    window.addEventListener("developer-links-updated", loadSupabaseData);
+    window.addEventListener("projects-updated", loadSupabaseData);
+    window.addEventListener("resume-updated", loadSupabaseData);
+
+    return () => {
+      window.removeEventListener("developer-links-updated", loadSupabaseData);
+      window.removeEventListener("projects-updated", loadSupabaseData);
+      window.removeEventListener("resume-updated", loadSupabaseData);
+    };
+  }, [user, isSignedIn]);
 
   const menuRef = useRef<HTMLDivElement>(null);
   const projectsRef = useRef<HTMLDivElement>(null);
