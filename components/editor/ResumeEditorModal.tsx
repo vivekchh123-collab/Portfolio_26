@@ -61,7 +61,7 @@ export default function ResumeEditorModal({
             .eq("user_id", user?.id)
             .single();
 
-          // Only update if valid resume_data object actually exists in DB
+          // Only update local state if valid resume_data object actually exists in Supabase
           if (
             data?.resume_data &&
             typeof data.resume_data === "object" &&
@@ -71,7 +71,7 @@ export default function ResumeEditorModal({
             setResumeData(data.resume_data as ResumeData);
           }
         } catch (err) {
-          console.error("Failed to fetch resume data", err);
+          console.error("Failed to fetch resume data from Supabase", err);
         } finally {
           setIsLoadingData(false);
         }
@@ -194,14 +194,13 @@ export default function ResumeEditorModal({
     }));
   };
 
-  // Save to Supabase
+  // Save to Supabase linked to Clerk User ID
   const handleSave = async () => {
     if (!user) {
       alert("You must be logged in to save resume data.");
       return;
     }
 
-    // Safety check: Prevent saving if data is empty or still loading
     if (!resumeData || Object.keys(resumeData).length === 0) {
       alert("Resume data is empty. Please enter your details before saving.");
       return;
