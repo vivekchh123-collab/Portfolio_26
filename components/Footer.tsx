@@ -161,7 +161,8 @@ export default function Footer() {
                 <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
                   For inquiries, project collaborations, or engineering
                   feedback, feel free to connect via GitHub or LeetCode from the
-                  top right navigation menu.
+                  top-right navigation menu, or email me at
+                  trackerrproo@gmail.com.
                 </p>
               </div>
             )}

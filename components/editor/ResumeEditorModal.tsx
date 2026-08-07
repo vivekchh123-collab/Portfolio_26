@@ -80,6 +80,12 @@ export default function ResumeEditorModal({
               !error
             ) {
               setFormData(data.resume_data as ResumeData);
+            } else if (user?.primaryEmailAddress?.emailAddress) {
+              // Pre-fill Clerk email if form email is empty or default placeholder
+              setFormData((prev) => ({
+                ...prev,
+                email: user.primaryEmailAddress?.emailAddress,
+              }));
             }
           } catch (err) {
             console.error("Failed to fetch resume data from Supabase", err);
@@ -91,7 +97,7 @@ export default function ResumeEditorModal({
         fetchResumeData();
       }
     } else {
-      // Reset ref when modal is closed so it can re-fetch fresh data next time it opens
+      // Reset ref when modal is closed
       hasLoadedRef.current = false;
     }
   }, [isOpen, user]);
@@ -207,9 +213,9 @@ export default function ResumeEditorModal({
     }));
   };
 
-  // Save to Supabase
+  // Save to Supabase (Guarantees user's logged-in Clerk email is attached to DB record)
   const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault(); // Prevent accidental page reload
+    e.preventDefault();
 
     if (!user) {
       alert("You must be logged in to save resume data.");
@@ -223,11 +229,23 @@ export default function ResumeEditorModal({
 
     setIsSaving(true);
 
+    // Resolve user's email: prefers explicit formData email unless template default, falls back to Clerk login email
+    const userEmail =
+      formData.email && formData.email !== "trackerrproo@gmail.com"
+        ? formData.email
+        : user.primaryEmailAddress?.emailAddress || formData.email;
+
+    const dataToSave: ResumeData = {
+      ...formData,
+      email: userEmail,
+    };
+
     try {
       const { error } = await supabase.from("profiles").upsert(
         {
           user_id: user.id,
-          resume_data: formData,
+          email: userEmail, // Saves primary email column in Supabase
+          resume_data: dataToSave,
           updated_at: new Date().toISOString(),
         },
         { onConflict: "user_id" },
@@ -237,7 +255,7 @@ export default function ResumeEditorModal({
         console.error("Supabase Save Error:", error.message);
         alert("Failed to save resume changes to database.");
       } else {
-        setExternalResumeData(formData);
+        setExternalResumeData(dataToSave);
         window.dispatchEvent(new Event("resume-updated"));
         onClose();
       }
@@ -375,7 +393,11 @@ export default function ResumeEditorModal({
               </label>
               <input
                 type="text"
-                value={formData?.email || ""}
+                value={
+                  formData?.email ||
+                  user?.primaryEmailAddress?.emailAddress ||
+                  ""
+                }
                 onChange={(e) =>
                   setFormData((prev) => ({ ...prev, email: e.target.value }))
                 }

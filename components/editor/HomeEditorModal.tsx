@@ -29,20 +29,24 @@ export default function HomeEditorModal({
     setSignature,
   } = useProfile();
 
-  const [modalUsername, setModalUsername] = useState("vivek_chaurasiya");
+  const [modalUsername, setModalUsername] = useState("olivia_wilson");
   const [isSaving, setIsSaving] = useState(false);
 
   // Fetch saved username directly from Supabase when modal opens
   useEffect(() => {
     if (user) {
       async function loadUsername() {
-        const { data } = await supabase
-          .from("profiles")
-          .select("username")
-          .eq("user_id", user?.id)
-          .single();
+        try {
+          const { data } = await supabase
+            .from("profiles")
+            .select("username, name, signature")
+            .eq("user_id", user?.id)
+            .single();
 
-        if (data?.username) setModalUsername(data.username);
+          if (data?.username) setModalUsername(data.username);
+        } catch (err) {
+          console.error("Failed to fetch username from Supabase", err);
+        }
       }
       loadUsername();
     }
@@ -110,13 +114,17 @@ export default function HomeEditorModal({
 
     setIsSaving(true);
 
+    // Resolve user's primary login email address from Clerk
+    const userEmail = user.primaryEmailAddress?.emailAddress;
+
     try {
-      // Upsert profile data directly to Supabase using Clerk user.id
+      // Upsert profile data directly to Supabase including email
       const { error } = await supabase.from("profiles").upsert(
         {
           user_id: user.id,
           username: modalUsername.trim(),
           name,
+          email: userEmail, // Saves user email address in Supabase
           role,
           bio,
           signature,
@@ -136,6 +144,7 @@ export default function HomeEditorModal({
       }
     } catch (e) {
       console.error("Failed to save profile:", e);
+      alert("An unexpected error occurred while saving.");
     } finally {
       setIsSaving(false);
     }
@@ -156,18 +165,17 @@ export default function HomeEditorModal({
         </h2>
 
         <div className="space-y-3">
-          {/* EDIT UNIQUE USERNAME (@) */}
+          {/* USERNAME FIELD */}
           <div>
-            <label className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
-              <AtSign size={14} className="text-indigo-500" />
-              Unique Username (@)
+            <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">
+              <AtSign size={13} className="text-indigo-500" /> Username / Handle
             </label>
             <input
               type="text"
               value={modalUsername}
               onChange={(e) => setModalUsername(e.target.value)}
-              className="w-full mt-1 p-2.5 border rounded-lg text-sm bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 font-mono text-indigo-400 focus:outline-none"
-              placeholder="unique_handle"
+              placeholder="e.g. olivia_wilson"
+              className="w-full mt-1 p-2.5 border rounded-lg text-sm bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 font-mono"
             />
           </div>
 
@@ -216,7 +224,7 @@ export default function HomeEditorModal({
               type="text"
               value={signature || ""}
               onChange={(e) => setSignature(e.target.value)}
-              placeholder="e.g. Vivek"
+              placeholder="e.g. Olivia Wilson"
               className="w-full mt-1 p-2.5 border rounded-lg text-sm bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 font-serif"
             />
           </div>

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import {
   SignInButton,
   SignUpButton,
@@ -21,7 +21,6 @@ import {
   LogIn,
   UserPlus,
   Lock,
-  Search,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import HomeEditorModal from "./editor/HomeEditorModal";
@@ -34,11 +33,14 @@ import ResumeEditorModal, { ResumeData } from "./editor/ResumeEditorModal";
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Read viewUser parameter from current URL to maintain shareable link context
+  const viewUserId = searchParams.get("viewUser");
+  const queryParam = viewUserId ? `?viewUser=${viewUserId}` : "";
+
   const [isOpen, setIsOpen] = useState(false);
   const [isProjectsDropdownOpen, setIsProjectsDropdownOpen] = useState(false);
-
-  // Search State
-  const [searchQuery, setSearchQuery] = useState("");
 
   // Clerk Auth Hooks
   const { user, isSignedIn, isLoaded } = useUser();
@@ -59,17 +61,6 @@ export default function Navbar() {
     } else {
       action();
     }
-  };
-
-  // Search Submit Handler (Navigates to URL params to show view-only profile data)
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!searchQuery.trim()) return;
-
-    // Clean @ from username input
-    const cleanUsername = searchQuery.trim().replace(/^@/, "");
-    router.push(`/?user=${cleanUsername}`);
-    setSearchQuery("");
   };
 
   // Profile Links
@@ -114,15 +105,16 @@ export default function Navbar() {
 
   const [resumeData, setResumeData] = useState<ResumeData>(defaultResume);
 
-  // Sync profile data directly from Supabase
+  // Sync profile data directly from Supabase (uses shared viewUserId if present)
   const loadSupabaseData = async () => {
-    if (!isSignedIn || !user) return;
+    const targetUserId = viewUserId || user?.id;
+    if (!targetUserId) return;
 
     try {
       const { data, error } = await supabase
         .from("profiles")
         .select("github_url, leetcode_url, projects, resume_data")
-        .eq("user_id", user.id)
+        .eq("user_id", targetUserId)
         .single();
 
       if (data && !error) {
@@ -156,7 +148,7 @@ export default function Navbar() {
       window.removeEventListener("projects-updated", loadSupabaseData);
       window.removeEventListener("resume-updated", loadSupabaseData);
     };
-  }, [user, isSignedIn]);
+  }, [user, isSignedIn, viewUserId]);
 
   const menuRef = useRef<HTMLDivElement>(null);
   const projectsRef = useRef<HTMLDivElement>(null);
@@ -209,9 +201,8 @@ export default function Navbar() {
     <>
       <nav className="fixed top-0 left-0 right-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 transition-colors">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between gap-4">
-          {/* TOP-LEFT LOGO & USERNAME SEARCH BAR */}
+          {/* TOP-LEFT LOGO */}
           <div className="flex items-center gap-3 sm:gap-4">
-            {/* Top-Left Logo Dropdown Menu */}
             <div className="relative" ref={menuRef}>
               <button
                 onClick={() => setIsOpen(!isOpen)}
@@ -317,30 +308,12 @@ export default function Navbar() {
                 </div>
               )}
             </div>
-
-            {/* SEARCH BAR (LOCATED JUST AFTER THE LOGO) */}
-            <form
-              onSubmit={handleSearchSubmit}
-              className="relative hidden sm:block w-44 md:w-60"
-            >
-              <input
-                type="text"
-                placeholder="Search @username..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-1.5 rounded-xl text-xs bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
-              />
-              <Search
-                size={14}
-                className="absolute left-3 top-2.5 text-slate-400"
-              />
-            </form>
           </div>
 
           {/* TOP-RIGHT NAVIGATION & CLERK AUTH */}
           <div className="flex gap-4 sm:gap-6 items-center font-medium text-slate-600 dark:text-slate-300 text-sm tracking-wide">
             <Link
-              href="/"
+              href={`/${queryParam}`}
               className="hover:text-black dark:hover:text-white transition"
             >
               About Me
@@ -348,7 +321,7 @@ export default function Navbar() {
 
             <div className="relative flex items-center" ref={projectsRef}>
               <Link
-                href="/projects"
+                href={`/projects${queryParam}`}
                 className="hover:text-black dark:hover:text-white transition py-2"
               >
                 Project
@@ -415,7 +388,7 @@ export default function Navbar() {
             </div>
 
             <Link
-              href="/resume"
+              href={`/resume${queryParam}`}
               className="hover:text-black dark:hover:text-white transition"
             >
               Resume
