@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import {
@@ -30,7 +30,7 @@ import AppShowcaseEditorModal, {
 } from "./editor/AppShowcaseEditorModal";
 import ResumeEditorModal, { ResumeData } from "./editor/ResumeEditorModal";
 
-export default function Navbar() {
+function NavbarContent() {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -467,5 +467,17 @@ export default function Navbar() {
         </>
       )}
     </>
+  );
+}
+
+export default function Navbar() {
+  return (
+    <Suspense
+      fallback={
+        <nav className="h-20 w-full fixed top-0 left-0 bg-white/80 dark:bg-slate-900/80 border-b border-slate-200 dark:border-slate-800 z-40" />
+      }
+    >
+      <NavbarContent />
+    </Suspense>
   );
 }
