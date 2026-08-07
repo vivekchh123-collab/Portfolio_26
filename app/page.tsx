@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import {
@@ -55,7 +55,7 @@ function HomeContent() {
   const [hasLiked, setHasLiked] = useState(false);
 
   // Load Profile and Engagement Counts directly from Supabase
-  const fetchPageProfile = async () => {
+  const fetchPageProfile = useCallback(async () => {
     if (!targetUserId) {
       setIsLoading(false);
       return;
@@ -88,9 +88,9 @@ function HomeContent() {
     } catch (e) {
       console.error("Failed to load profile from database", e);
     } finally {
-      setIsLoading(false); // Hide home skeleton when profile data arrives
+      setIsLoading(false);
     }
-  };
+  }, [targetUserId, profileContext]);
 
   useEffect(() => {
     fetchPageProfile();
@@ -98,9 +98,9 @@ function HomeContent() {
     window.addEventListener("profile-updated", fetchPageProfile);
     return () =>
       window.removeEventListener("profile-updated", fetchPageProfile);
-  }, [user, searchParams, targetUserId]);
+  }, [fetchPageProfile]);
 
-  // Public Follow Handler
+  // Public Follow Handler - Using UPDATE instead of UPSERT
   const handleFollowToggle = async () => {
     if (!targetUserId) return;
 
@@ -112,17 +112,24 @@ function HomeContent() {
     setIsFollowing(nextIsFollowing);
     setFollowerCount(nextFollowerCount);
 
-    await supabase.from("profiles").upsert(
-      {
-        user_id: targetUserId,
-        follower_count: nextFollowerCount,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "user_id" },
-    );
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          follower_count: nextFollowerCount,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", targetUserId);
+
+      if (error) {
+        console.error("Failed to sync follower count:", error.message);
+      }
+    } catch (err) {
+      console.error("Follow sync error:", err);
+    }
   };
 
-  // Public Profile Like Handler
+  // Public Profile Like Handler - Using UPDATE instead of UPSERT
   const handleProfileLikeToggle = async () => {
     if (!targetUserId) return;
 
@@ -134,14 +141,21 @@ function HomeContent() {
     setHasLiked(nextHasLiked);
     setLikeCount(nextLikeCount);
 
-    await supabase.from("profiles").upsert(
-      {
-        user_id: targetUserId,
-        like_count: nextLikeCount,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "user_id" },
-    );
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          like_count: nextLikeCount,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", targetUserId);
+
+      if (error) {
+        console.error("Failed to sync like count:", error.message);
+      }
+    } catch (err) {
+      console.error("Like sync error:", err);
+    }
   };
 
   // Generate Direct Shareable Link with target ID
@@ -179,7 +193,6 @@ function HomeContent() {
 
   return (
     <>
-      {/* Home / About Me Specific Skeleton */}
       {isLoading && <HomeSkeleton />}
 
       <main className="min-h-[calc(100vh-5rem)] pt-24 pb-12 flex items-center justify-center text-slate-900 dark:text-slate-100 transition-colors px-4">
@@ -194,7 +207,6 @@ function HomeContent() {
                       Hi, I'm
                     </p>
 
-                    {/* Share Direct View-Only Link Button */}
                     {!isViewingGuest && (
                       <button
                         onClick={handleCopyShareLink}
@@ -288,7 +300,6 @@ function HomeContent() {
                   </div>
                 </div>
 
-                {/* Visitor Public Engagement Controls */}
                 <div className="flex gap-2">
                   <button
                     onClick={handleFollowToggle}

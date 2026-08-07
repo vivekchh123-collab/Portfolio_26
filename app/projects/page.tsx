@@ -143,7 +143,7 @@ function ProjectsContent() {
     };
   }, [user, viewUserId, targetUserId]);
 
-  // Save Engagements to Supabase publicly
+  // Save Engagements to Supabase publicly using UPDATE instead of UPSERT
   const syncEngagementsToSupabase = async (
     updatedLikes: Record<string, number>,
     updatedUserLikes: Record<string, boolean>,
@@ -151,16 +151,23 @@ function ProjectsContent() {
   ) => {
     if (!targetUserId) return;
 
-    await supabase.from("profiles").upsert(
-      {
-        user_id: targetUserId,
-        project_likes_map: updatedLikes,
-        project_user_likes_map: updatedUserLikes,
-        project_comments_map: updatedComments,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "user_id" },
-    );
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          project_likes_map: updatedLikes,
+          project_user_likes_map: updatedUserLikes,
+          project_comments_map: updatedComments,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", targetUserId);
+
+      if (error) {
+        console.error("Supabase engagement sync error:", error.message);
+      }
+    } catch (err) {
+      console.error("Failed to sync engagements:", err);
+    }
   };
 
   // Handle Like Toggle
