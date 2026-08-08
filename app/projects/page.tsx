@@ -143,7 +143,7 @@ function ProjectsContent() {
     };
   }, [user, viewUserId, targetUserId]);
 
-  // Save Engagements to Supabase publicly using UPDATE instead of UPSERT
+  // Save Engagements to Supabase publicly using UPDATE
   const syncEngagementsToSupabase = async (
     updatedLikes: Record<string, number>,
     updatedUserLikes: Record<string, boolean>,
@@ -166,7 +166,7 @@ function ProjectsContent() {
         console.error("Supabase engagement sync error:", error.message);
       }
     } catch (err) {
-      console.error("Failed to sync engagements:", err);
+      console.error("Failed to sync project engagements:", err);
     }
   };
 
@@ -183,9 +183,11 @@ function ProjectsContent() {
     const updatedLikesMap = { ...likesMap, [projectId]: nextLikes };
     const updatedUserLikesMap = { ...userLikesMap, [projectId]: nextUserLikes };
 
+    // Update UI state immediately
     setLikesMap(updatedLikesMap);
     setUserLikesMap(updatedUserLikesMap);
 
+    // Sync to Supabase
     syncEngagementsToSupabase(
       updatedLikesMap,
       updatedUserLikesMap,
