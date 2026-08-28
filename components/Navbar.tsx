@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useRef, useEffect, Suspense } from "react";
+import { useState, useRef, useEffect, useCallback, Suspense } from "react";
 import Link from "next/link";
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   SignInButton,
   SignUpButton,
@@ -30,9 +30,11 @@ import AppShowcaseEditorModal, {
 } from "./editor/AppShowcaseEditorModal";
 import ResumeEditorModal, { ResumeData } from "./editor/ResumeEditorModal";
 
+const DEFAULT_GITHUB_URL = "https://github.com";
+const DEFAULT_LEETCODE_URL = "https://leetcode.com";
+
 function NavbarContent() {
   const pathname = usePathname();
-  const router = useRouter();
   const searchParams = useSearchParams();
 
   // Read viewUser parameter from current URL to maintain shareable link context
@@ -45,6 +47,9 @@ function NavbarContent() {
   // Clerk Auth Hooks
   const { user, isSignedIn, isLoaded } = useUser();
   const { openSignIn } = useClerk();
+
+  // Target User ID for data loading
+  const targetUserId = viewUserId || user?.id;
 
   // Editor Modal States
   const [isHomeEditModalOpen, setIsHomeEditModalOpen] = useState(false);
@@ -63,13 +68,9 @@ function NavbarContent() {
     }
   };
 
-  // Profile Links
-  const [githubUrl, setGithubUrl] = useState(
-    "https://github.com/vivekchh123-collab",
-  );
-  const [leetcodeUrl, setLeetcodeUrl] = useState(
-    "https://leetcode.com/u/vivek_chaurasiya_14/",
-  );
+  // Profile Links with explicit string types
+  const [githubUrl, setGithubUrl] = useState<string>(DEFAULT_GITHUB_URL);
+  const [leetcodeUrl, setLeetcodeUrl] = useState<string>(DEFAULT_LEETCODE_URL);
 
   // Default Projects Fallback
   const defaultProjects: ProjectItem[] = [
@@ -105,9 +106,8 @@ function NavbarContent() {
 
   const [resumeData, setResumeData] = useState<ResumeData>(defaultResume);
 
-  // Sync profile data directly from Supabase (uses shared viewUserId if present)
-  const loadSupabaseData = async () => {
-    const targetUserId = viewUserId || user?.id;
+  // Stable Supabase fetch handler to prevent loop queries
+  const loadSupabaseData = useCallback(async () => {
     if (!targetUserId) return;
 
     try {
@@ -118,8 +118,12 @@ function NavbarContent() {
         .single();
 
       if (data && !error) {
-        if (data.github_url) setGithubUrl(data.github_url);
-        if (data.leetcode_url) setLeetcodeUrl(data.leetcode_url);
+        if (typeof data.github_url === "string" && data.github_url.trim()) {
+          setGithubUrl(data.github_url.trim());
+        }
+        if (typeof data.leetcode_url === "string" && data.leetcode_url.trim()) {
+          setLeetcodeUrl(data.leetcode_url.trim());
+        }
         if (
           data.projects &&
           Array.isArray(data.projects) &&
@@ -134,7 +138,7 @@ function NavbarContent() {
     } catch (e) {
       console.error("Failed to load Navbar data from Supabase", e);
     }
-  };
+  }, [targetUserId]);
 
   useEffect(() => {
     loadSupabaseData();
@@ -148,7 +152,7 @@ function NavbarContent() {
       window.removeEventListener("projects-updated", loadSupabaseData);
       window.removeEventListener("resume-updated", loadSupabaseData);
     };
-  }, [user, isSignedIn, viewUserId]);
+  }, [loadSupabaseData]);
 
   const menuRef = useRef<HTMLDivElement>(null);
   const projectsRef = useRef<HTMLDivElement>(null);
@@ -196,6 +200,14 @@ function NavbarContent() {
       document.documentElement.classList.remove("dark");
     }
   };
+
+  const safeGithubHref = githubUrl?.startsWith("http")
+    ? githubUrl
+    : `https://${githubUrl || "github.com"}`;
+
+  const safeLeetcodeHref = leetcodeUrl?.startsWith("http")
+    ? leetcodeUrl
+    : `https://${leetcodeUrl || "leetcode.com"}`;
 
   return (
     <>
@@ -344,7 +356,7 @@ function NavbarContent() {
               {isProjectsDropdownOpen && (
                 <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl py-2 z-50">
                   <a
-                    href={githubUrl}
+                    href={safeGithubHref}
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={() => setIsProjectsDropdownOpen(false)}
@@ -362,7 +374,7 @@ function NavbarContent() {
                   </a>
 
                   <a
-                    href={leetcodeUrl}
+                    href={safeLeetcodeHref}
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={() => setIsProjectsDropdownOpen(false)}

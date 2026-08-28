@@ -1,13 +1,33 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { X, ShieldCheck, FileText, Lock, Activity, Mail } from "lucide-react";
 
 export default function Footer() {
   const [activeModal, setActiveModal] = useState<string | null>(null);
 
-  const closeModal = () => setActiveModal(null);
+  const closeModal = useCallback(() => setActiveModal(null), []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        closeModal();
+      }
+    };
+
+    if (activeModal) {
+      document.body.style.overflow = "hidden";
+      window.addEventListener("keydown", handleKeyDown);
+    } else {
+      document.body.style.overflow = "";
+    }
+
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [activeModal, closeModal]);
 
   return (
     <>
@@ -15,7 +35,6 @@ export default function Footer() {
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           {/* Left Side: V Logo & Copyright */}
           <div className="flex items-center gap-3">
-            {/* Custom V Logo */}
             <div className="w-5 h-5 flex items-center justify-center text-black dark:text-white fill-current">
               <svg
                 width="20"
@@ -86,7 +105,9 @@ export default function Footer() {
       {activeModal && (
         <div
           onClick={closeModal}
-          className="fixed inset-0 z-[150] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200"
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-[150] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
         >
           <div
             onClick={(e) => e.stopPropagation()}
@@ -94,6 +115,7 @@ export default function Footer() {
           >
             <button
               onClick={closeModal}
+              aria-label="Close modal"
               className="absolute top-4 right-4 text-slate-400 hover:text-black dark:hover:text-white cursor-pointer"
             >
               <X size={18} />
@@ -161,8 +183,7 @@ export default function Footer() {
                 <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
                   For inquiries, project collaborations, or engineering
                   feedback, feel free to connect via GitHub or LeetCode from the
-                  top-right navigation menu, or email me at
-                  trackerrproo@gmail.com.
+                  top-right navigation menu.
                 </p>
               </div>
             )}

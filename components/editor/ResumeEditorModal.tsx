@@ -57,14 +57,14 @@ export default function ResumeEditorModal({
   const hasLoadedRef = useRef(false);
 
   useEffect(() => {
+    let isMounted = true;
+
     if (isOpen) {
-      // Sync initial external data if present
       if (externalResumeData && Object.keys(externalResumeData).length > 0) {
         setFormData(externalResumeData);
       }
 
-      // Fetch from Supabase ONLY ONCE per opening
-      if (user && !hasLoadedRef.current) {
+      if (user?.id && !hasLoadedRef.current) {
         async function fetchResumeData() {
           try {
             const { data, error } = await supabase
@@ -74,50 +74,115 @@ export default function ResumeEditorModal({
               .single();
 
             if (
+              isMounted &&
               data?.resume_data &&
               typeof data.resume_data === "object" &&
               Object.keys(data.resume_data).length > 0 &&
               !error
             ) {
               setFormData(data.resume_data as ResumeData);
-            } else if (user?.primaryEmailAddress?.emailAddress) {
-              // Pre-fill Clerk email if form email is empty or default placeholder
+            } else if (isMounted && user?.primaryEmailAddress?.emailAddress) {
               setFormData((prev) => ({
                 ...prev,
-                email: user.primaryEmailAddress?.emailAddress,
+                email: user?.primaryEmailAddress?.emailAddress || prev.email,
               }));
             }
           } catch (err) {
             console.error("Failed to fetch resume data from Supabase", err);
           } finally {
-            hasLoadedRef.current = true; // Lock further background re-fetches
+            if (isMounted) {
+              hasLoadedRef.current = true;
+            }
           }
         }
 
         fetchResumeData();
       }
     } else {
-      // Reset ref when modal is closed
       hasLoadedRef.current = false;
     }
-  }, [isOpen, user]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen, user, externalResumeData]);
+
+  // Modal Escape key and scroll lock
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+      window.addEventListener("keydown", handleKeyDown);
+    } else {
+      document.body.style.overflow = "";
+    }
+
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
-  // Image Upload Handler
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
+  // Compress uploaded photo
+  const compressImage = (
+    file: File,
+    maxWidth = 800,
+    quality = 0.7,
+  ): Promise<string> => {
+    return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === "string") {
-          setFormData((prev) => ({
-            ...prev,
-            photoUrl: reader.result as string,
-          }));
-        }
-      };
       reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          let width = img.width;
+          let height = img.height;
+
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+
+          canvas.width = Math.max(1, width);
+          canvas.height = Math.max(1, height);
+
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const compressedDataUrl = canvas.toDataURL("image/jpeg", quality);
+            resolve(compressedDataUrl);
+          } else {
+            reject(new Error("Canvas context unavailable"));
+          }
+        };
+        img.onerror = (error) => reject(error);
+      };
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const compressed = await compressImage(file);
+      setFormData((prev) => ({
+        ...prev,
+        photoUrl: compressed,
+      }));
+    } catch (err) {
+      console.error("Failed to process photo upload:", err);
+      alert("Could not process this image file.");
     }
   };
 
@@ -213,7 +278,7 @@ export default function ResumeEditorModal({
     }));
   };
 
-  // Save to Supabase (Guarantees user's logged-in Clerk email is attached to DB record)
+  // Save to Supabase
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -229,7 +294,6 @@ export default function ResumeEditorModal({
 
     setIsSaving(true);
 
-    // Resolve user's email: prefers explicit formData email unless template default, falls back to Clerk login email
     const userEmail =
       formData.email && formData.email !== "trackerrproo@gmail.com"
         ? formData.email
@@ -244,7 +308,7 @@ export default function ResumeEditorModal({
       const { error } = await supabase.from("profiles").upsert(
         {
           user_id: user.id,
-          email: userEmail, // Saves primary email column in Supabase
+          email: userEmail,
           resume_data: dataToSave,
           updated_at: new Date().toISOString(),
         },
@@ -268,8 +332,14 @@ export default function ResumeEditorModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 pt-24">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 w-full max-w-3xl max-h-[85vh] overflow-y-auto space-y-6 shadow-2xl relative text-slate-900 dark:text-slate-100">
+    <div
+      onClick={onClose}
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 pt-24 animate-in fade-in duration-200"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 w-full max-w-3xl max-h-[85vh] overflow-y-auto space-y-6 shadow-2xl relative text-slate-900 dark:text-slate-100"
+      >
         {/* Close Button */}
         <button
           type="button"
@@ -335,7 +405,7 @@ export default function ResumeEditorModal({
                 Profile Image
               </label>
               <div className="flex gap-2 items-center mt-1">
-                <label className="flex items-center gap-2 p-2 border border-dashed rounded-lg text-xs bg-slate-50 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 cursor-pointer">
+                <label className="flex items-center gap-2 p-2 border border-dashed rounded-lg text-xs bg-slate-50 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition">
                   <Upload size={14} /> Upload from folder
                   <input
                     type="file"
@@ -491,7 +561,10 @@ export default function ResumeEditorModal({
                 onChange={(e) =>
                   setFormData((prev) => ({
                     ...prev,
-                    skills: e.target.value.split(",").map((s) => s.trim()),
+                    skills: e.target.value
+                      .split(",")
+                      .map((s) => s.trim())
+                      .filter(Boolean),
                   }))
                 }
                 className="w-full mt-1 p-2 border rounded-lg text-sm bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700"
@@ -508,7 +581,10 @@ export default function ResumeEditorModal({
                 onChange={(e) =>
                   setFormData((prev) => ({
                     ...prev,
-                    languages: e.target.value.split(",").map((l) => l.trim()),
+                    languages: e.target.value
+                      .split(",")
+                      .map((l) => l.trim())
+                      .filter(Boolean),
                   }))
                 }
                 className="w-full mt-1 p-2 border rounded-lg text-sm bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700"

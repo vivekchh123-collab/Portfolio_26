@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   ExternalLink,
@@ -94,7 +94,7 @@ function ProjectsContent() {
   const [projects, setProjects] = useState<ProjectItem[]>(defaultProjects);
 
   // Fetch Projects and Engagements from Supabase
-  const loadProjectsData = async () => {
+  const loadProjectsData = useCallback(async () => {
     if (!targetUserId) {
       setIsLoading(false);
       return;
@@ -128,7 +128,7 @@ function ProjectsContent() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [targetUserId]);
 
   useEffect(() => {
     loadProjectsData();
@@ -141,7 +141,7 @@ function ProjectsContent() {
       window.removeEventListener("open-projects-editor", handleOpenEditor);
       window.removeEventListener("projects-updated", loadProjectsData);
     };
-  }, [user, viewUserId, targetUserId]);
+  }, [loadProjectsData]);
 
   // Save Engagements to Supabase publicly using UPDATE
   const syncEngagementsToSupabase = async (

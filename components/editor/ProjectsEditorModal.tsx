@@ -9,9 +9,13 @@ interface ProjectsEditorModalProps {
   isOpen: boolean;
   onClose: () => void;
   githubUrl: string;
-  setGithubUrl: (url: string) => void;
+  setGithubUrl:
+    | React.Dispatch<React.SetStateAction<string>>
+    | ((url: string) => void);
   leetcodeUrl: string;
-  setLeetcodeUrl: (url: string) => void;
+  setLeetcodeUrl:
+    | React.Dispatch<React.SetStateAction<string>>
+    | ((url: string) => void);
 }
 
 export default function ProjectsEditorModal({
@@ -24,44 +28,90 @@ export default function ProjectsEditorModal({
 }: ProjectsEditorModalProps) {
   const { user } = useUser();
   const [isSaving, setIsSaving] = useState(false);
+  const [localGithub, setLocalGithub] = useState<string>(githubUrl || "");
+  const [localLeetcode, setLocalLeetcode] = useState<string>(leetcodeUrl || "");
 
   // Sync developer links directly from Supabase when modal opens
   useEffect(() => {
-    if (isOpen && user) {
-      async function fetchDevLinks() {
-        const { data } = await supabase
-          .from("profiles")
-          .select("github_url, leetcode_url")
-          .eq("user_id", user?.id)
-          .single();
+    let isMounted = true;
 
-        if (data) {
-          if (data.github_url) setGithubUrl(data.github_url);
-          if (data.leetcode_url) setLeetcodeUrl(data.leetcode_url);
+    if (isOpen) {
+      setLocalGithub(githubUrl || "");
+      setLocalLeetcode(leetcodeUrl || "");
+
+      if (user?.id) {
+        async function fetchDevLinks() {
+          try {
+            const { data, error } = await supabase
+              .from("profiles")
+              .select("github_url, leetcode_url")
+              .eq("user_id", user?.id)
+              .single();
+
+            if (isMounted && data && !error) {
+              if (typeof data.github_url === "string") {
+                setLocalGithub(data.github_url);
+                setGithubUrl(data.github_url);
+              }
+              if (typeof data.leetcode_url === "string") {
+                setLocalLeetcode(data.leetcode_url);
+                setLeetcodeUrl(data.leetcode_url);
+              }
+            }
+          } catch (err) {
+            console.error("Failed to fetch links from Supabase:", err);
+          }
         }
-      }
 
-      fetchDevLinks();
+        fetchDevLinks();
+      }
     }
-  }, [isOpen, user, setGithubUrl, setLeetcodeUrl]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen, user, githubUrl, leetcodeUrl, setGithubUrl, setLeetcodeUrl]);
+
+  // Modal Escape key and scroll lock
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+      window.addEventListener("keydown", handleKeyDown);
+    } else {
+      document.body.style.overflow = "";
+    }
+
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
   const handleSave = async () => {
-    if (!user) {
+    if (!user?.id) {
       alert("You must be logged in to save developer links.");
       return;
     }
 
     setIsSaving(true);
 
+    const cleanGithub = localGithub.trim();
+    const cleanLeetcode = localLeetcode.trim();
+
     try {
-      // Upsert GitHub and LeetCode URLs directly to Supabase tied to user.id
       const { error } = await supabase.from("profiles").upsert(
         {
           user_id: user.id,
-          github_url: githubUrl.trim(),
-          leetcode_url: leetcodeUrl.trim(),
+          github_url: cleanGithub,
+          leetcode_url: cleanLeetcode,
           updated_at: new Date().toISOString(),
         },
         { onConflict: "user_id" },
@@ -71,7 +121,8 @@ export default function ProjectsEditorModal({
         console.error("Supabase Save Error:", error.message);
         alert("Failed to save developer links to database.");
       } else {
-        // Broadcast custom event so parent components re-fetch updated links
+        setGithubUrl(cleanGithub);
+        setLeetcodeUrl(cleanLeetcode);
         window.dispatchEvent(new Event("developer-links-updated"));
         onClose();
       }
@@ -84,10 +135,17 @@ export default function ProjectsEditorModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 pt-24">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 w-full max-w-lg space-y-6 shadow-2xl relative text-slate-900 dark:text-slate-100 max-h-[85vh] overflow-y-auto">
+    <div
+      onClick={onClose}
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 pt-24 animate-in fade-in duration-200"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 w-full max-w-lg space-y-6 shadow-2xl relative text-slate-900 dark:text-slate-100 max-h-[85vh] overflow-y-auto"
+      >
         {/* Close Button */}
         <button
+          type="button"
           onClick={onClose}
           className="absolute top-4 right-4 p-2 rounded-lg text-slate-400 hover:text-black dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
         >
@@ -107,13 +165,12 @@ export default function ProjectsEditorModal({
             </label>
             <input
               type="text"
-              value={githubUrl}
-              onChange={(e) => setGithubUrl(e.target.value)}
+              value={localGithub}
+              onChange={(e) => setLocalGithub(e.target.value)}
               placeholder="https://github.com/your-username"
-              className="w-full p-2.5 border rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-indigo-600 font-mono text-xs"
+              className="w-full p-2.5 border rounded-xl bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-indigo-600 font-mono text-xs"
             />
 
-            {/* Built-in GitHub Description */}
             <div className="bg-slate-100 dark:bg-slate-800/60 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700/60 text-xs space-y-2">
               <p className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                 <HelpCircle size={14} className="text-indigo-500" />
@@ -154,13 +211,12 @@ export default function ProjectsEditorModal({
             </label>
             <input
               type="text"
-              value={leetcodeUrl}
-              onChange={(e) => setLeetcodeUrl(e.target.value)}
+              value={localLeetcode}
+              onChange={(e) => setLocalLeetcode(e.target.value)}
               placeholder="https://leetcode.com/u/your-username/"
-              className="w-full p-2.5 border rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-indigo-600 font-mono text-xs"
+              className="w-full p-2.5 border rounded-xl bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-indigo-600 font-mono text-xs"
             />
 
-            {/* Built-in LeetCode Description */}
             <div className="bg-slate-100 dark:bg-slate-800/60 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700/60 text-xs space-y-2">
               <p className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                 <HelpCircle size={14} className="text-amber-500" />
@@ -189,7 +245,7 @@ export default function ProjectsEditorModal({
                 </li>
                 <li>
                   Your solved stats automatically sync publicly when visitors
-                  click or view stats cards!
+                  click or view stats cards.
                 </li>
               </ul>
             </div>
@@ -197,6 +253,7 @@ export default function ProjectsEditorModal({
         </div>
 
         <button
+          type="button"
           onClick={handleSave}
           disabled={isSaving}
           className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl text-sm transition mt-2 cursor-pointer shadow-lg disabled:opacity-50"

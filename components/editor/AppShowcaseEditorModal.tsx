@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { X, Plus, Trash2, Upload, Layers, RefreshCw } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { supabase } from "@/lib/supabaseClient";
@@ -45,40 +45,80 @@ export default function AppShowcaseEditorModal({
   const [localProjects, setLocalProjects] =
     useState<ProjectItem[]>(defaultProjects);
 
-  // Sync projects with Supabase on mount/open
+  // Sync projects with Supabase on modal open
   useEffect(() => {
+    let isMounted = true;
+
     if (isOpen && user) {
       async function fetchUserProjects() {
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("projects")
-          .eq("user_id", user?.id)
-          .single();
+        try {
+          const { data, error } = await supabase
+            .from("profiles")
+            .select("projects")
+            .eq("user_id", user?.id)
+            .single();
 
-        if (
-          data?.projects &&
-          Array.isArray(data.projects) &&
-          data.projects.length > 0
-        ) {
-          setLocalProjects(data.projects);
-          if (externalSetProjects) externalSetProjects(data.projects);
-        } else if (externalProjects && externalProjects.length > 0) {
-          setLocalProjects(externalProjects);
+          if (
+            isMounted &&
+            data?.projects &&
+            Array.isArray(data.projects) &&
+            data.projects.length > 0 &&
+            !error
+          ) {
+            setLocalProjects(data.projects);
+            if (externalSetProjects) externalSetProjects(data.projects);
+          } else if (
+            isMounted &&
+            externalProjects &&
+            externalProjects.length > 0
+          ) {
+            setLocalProjects(externalProjects);
+          }
+        } catch (err) {
+          console.error("Failed to fetch projects in editor modal:", err);
         }
       }
 
       fetchUserProjects();
     }
-  }, [isOpen, user]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen, user, externalProjects, externalSetProjects]);
+
+  // Modal Escape key and scroll lock
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+      window.addEventListener("keydown", handleKeyDown);
+    } else {
+      document.body.style.overflow = "";
+    }
+
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen, onClose]);
+
+  const updateProjectsState = useCallback(
+    (updatedList: ProjectItem[]) => {
+      setLocalProjects(updatedList);
+      if (externalSetProjects) {
+        externalSetProjects(updatedList);
+      }
+    },
+    [externalSetProjects],
+  );
 
   if (!isOpen) return null;
-
-  const updateProjectsState = (updatedList: ProjectItem[]) => {
-    setLocalProjects(updatedList);
-    if (externalSetProjects) {
-      externalSetProjects(updatedList);
-    }
-  };
 
   const handleAddProject = () => {
     const newProject: ProjectItem = {
@@ -86,7 +126,7 @@ export default function AppShowcaseEditorModal({
       name: "New Application Name",
       description: "Short description of the application...",
       appUrl: "https://my-app.vercel.app",
-      techStack: ["Next.js", "Node.js", "Prisma", "PostgreSQL"],
+      techStack: ["Next.js", "TypeScript", "Tailwind CSS"],
       images: [],
     };
     const updated = [...localProjects, newProject];
@@ -109,44 +149,60 @@ export default function AppShowcaseEditorModal({
     updateProjectsState(updated);
   };
 
-  const handleImageUpload = (
+  // Asynchronous image reader helper
+  const readFileAsDataUrl = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === "string") {
+          resolve(reader.result);
+        } else {
+          reject(new Error("Failed to read image"));
+        }
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleImageUpload = async (
     id: string,
     e: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const files = e.target.files;
-    if (!files) return;
+    if (!files || files.length === 0) return;
 
     const fileList = Array.from(files);
-    const loadedImages: string[] = [];
+    const validFiles: File[] = [];
 
     fileList.forEach((file) => {
       if (file.size > 2 * 1024 * 1024) {
         alert(
           `File "${file.name}" exceeds 2MB limit. Please choose a smaller file.`,
         );
-        return;
+      } else {
+        validFiles.push(file);
       }
-
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === "string") {
-          loadedImages.push(reader.result);
-          if (loadedImages.length === fileList.length) {
-            const project = localProjects.find((p) => p.id === id);
-            if (project) {
-              handleProjectChange(id, "images", [
-                ...project.images,
-                ...loadedImages,
-              ]);
-            }
-          }
-        }
-      };
-      reader.readAsDataURL(file);
     });
+
+    try {
+      const uploadedDataUrls = await Promise.all(
+        validFiles.map((file) => readFileAsDataUrl(file)),
+      );
+
+      const project = localProjects.find((p) => p.id === id);
+      if (project && uploadedDataUrls.length > 0) {
+        handleProjectChange(id, "images", [
+          ...project.images,
+          ...uploadedDataUrls,
+        ]);
+      }
+    } catch (err) {
+      console.error("Error reading uploaded images:", err);
+    }
   };
 
-  const handleReplaceImage = (
+  const handleReplaceImage = async (
     projectId: string,
     imageIndex: number,
     e: React.ChangeEvent<HTMLInputElement>,
@@ -159,18 +215,17 @@ export default function AppShowcaseEditorModal({
       return;
     }
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      if (typeof reader.result === "string") {
-        const project = localProjects.find((p) => p.id === projectId);
-        if (project) {
-          const updatedImages = [...project.images];
-          updatedImages[imageIndex] = reader.result;
-          handleProjectChange(projectId, "images", updatedImages);
-        }
+    try {
+      const base64 = await readFileAsDataUrl(file);
+      const project = localProjects.find((p) => p.id === projectId);
+      if (project) {
+        const updatedImages = [...project.images];
+        updatedImages[imageIndex] = base64;
+        handleProjectChange(projectId, "images", updatedImages);
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error("Error replacing image:", err);
+    }
   };
 
   const handleRemoveImage = (projectId: string, imageIndex: number) => {
@@ -192,7 +247,6 @@ export default function AppShowcaseEditorModal({
     setIsSaving(true);
 
     try {
-      // Save projects directly to Supabase tied to user.id
       const { error } = await supabase.from("profiles").upsert(
         {
           user_id: user.id,
@@ -218,8 +272,14 @@ export default function AppShowcaseEditorModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 pt-24">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 w-full max-w-3xl space-y-6 shadow-2xl relative text-slate-900 dark:text-slate-100 max-h-[85vh] overflow-y-auto">
+    <div
+      onClick={onClose}
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 pt-24 animate-in fade-in duration-200"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 w-full max-w-3xl space-y-6 shadow-2xl relative text-slate-900 dark:text-slate-100 max-h-[85vh] overflow-y-auto"
+      >
         {/* Close Button */}
         <button
           onClick={onClose}
@@ -384,7 +444,10 @@ export default function AppShowcaseEditorModal({
                     handleProjectChange(
                       project.id,
                       "techStack",
-                      e.target.value.split(",").map((t) => t.trim()),
+                      e.target.value
+                        .split(",")
+                        .map((t) => t.trim())
+                        .filter(Boolean),
                     )
                   }
                   className="w-full mt-1 p-2 border rounded-lg text-xs bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700"

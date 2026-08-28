@@ -1,6 +1,12 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Caveat } from "next/font/google";
@@ -50,6 +56,7 @@ export function useProfile() {
 
 function LayoutContent({ children }: { children: React.ReactNode }) {
   const { user, isSignedIn } = useUser();
+  const userId = user?.id;
 
   const [name, setName] = useState("Portfolio Owner");
   const [role, setRole] = useState("Designer & Developer");
@@ -59,38 +66,38 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
   const [profileImg, setProfileImg] = useState(DEFAULT_AVATAR);
   const [signature, setSignature] = useState("Signature");
 
-  // Fetch initial profile state directly from Supabase or fallback to Clerk user
-  const loadProfileFromSupabase = async () => {
-    if (!isSignedIn || !user) return;
+  // Stable profile loader with isolated dependency
+  const loadProfileFromSupabase = useCallback(async () => {
+    if (!isSignedIn || !userId) return;
 
     try {
       const { data, error } = await supabase
         .from("profiles")
         .select("name, role, bio, profile_img, signature")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .single();
 
       if (data && !error) {
         if (data.name) setName(data.name);
-        else if (user.fullName) setName(user.fullName);
+        else if (user?.fullName) setName(user.fullName);
 
         if (data.role) setRole(data.role);
         if (data.bio) setBio(data.bio);
 
         if (data.profile_img) setProfileImg(data.profile_img);
-        else if (user.imageUrl) setProfileImg(user.imageUrl);
+        else if (user?.imageUrl) setProfileImg(user.imageUrl);
 
         if (data.signature) setSignature(data.signature);
-        else if (user.firstName) setSignature(user.firstName);
+        else if (user?.firstName) setSignature(user.firstName);
       } else {
-        if (user.fullName) setName(user.fullName);
-        if (user.firstName) setSignature(user.firstName);
-        if (user.imageUrl) setProfileImg(user.imageUrl);
+        if (user?.fullName) setName(user.fullName);
+        if (user?.firstName) setSignature(user.firstName);
+        if (user?.imageUrl) setProfileImg(user.imageUrl);
       }
     } catch (e) {
       console.error("Failed to fetch layout profile context from Supabase", e);
     }
-  };
+  }, [isSignedIn, userId, user?.fullName, user?.firstName, user?.imageUrl]);
 
   useEffect(() => {
     loadProfileFromSupabase();
@@ -98,7 +105,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
     window.addEventListener("profile-updated", loadProfileFromSupabase);
     return () =>
       window.removeEventListener("profile-updated", loadProfileFromSupabase);
-  }, [user, isSignedIn]);
+  }, [loadProfileFromSupabase]);
 
   return (
     <ProfileContext.Provider

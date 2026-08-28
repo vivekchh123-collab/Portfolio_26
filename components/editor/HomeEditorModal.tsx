@@ -29,28 +29,66 @@ export default function HomeEditorModal({
     setSignature,
   } = useProfile();
 
-  const [modalUsername, setModalUsername] = useState("olivia_wilson");
+  const [modalUsername, setModalUsername] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
   // Fetch saved username directly from Supabase when modal opens
   useEffect(() => {
-    if (user) {
+    let isMounted = true;
+
+    if (isOpen && user?.id) {
       async function loadUsername() {
         try {
-          const { data } = await supabase
+          const { data, error } = await supabase
             .from("profiles")
-            .select("username, name, signature")
+            .select("username")
             .eq("user_id", user?.id)
             .single();
 
-          if (data?.username) setModalUsername(data.username);
+          if (isMounted) {
+            if (data?.username && !error) {
+              setModalUsername(data.username);
+            } else if (user?.username) {
+              setModalUsername(user.username);
+            } else if (user?.fullName) {
+              setModalUsername(
+                user.fullName.toLowerCase().replace(/\s+/g, "_"),
+              );
+            }
+          }
         } catch (err) {
           console.error("Failed to fetch username from Supabase", err);
         }
       }
+
       loadUsername();
     }
-  }, [user]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen, user]);
+
+  // Modal Escape key and scroll lock
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+      window.addEventListener("keydown", handleKeyDown);
+    } else {
+      document.body.style.overflow = "";
+    }
+
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -85,11 +123,12 @@ export default function HomeEditorModal({
             const compressedDataUrl = canvas.toDataURL("image/jpeg", quality);
             resolve(compressedDataUrl);
           } else {
-            reject("Canvas context unavailable");
+            reject(new Error("Canvas context unavailable"));
           }
         };
         img.onerror = (error) => reject(error);
       };
+      reader.onerror = (error) => reject(error);
     });
   };
 
@@ -113,18 +152,16 @@ export default function HomeEditorModal({
     }
 
     setIsSaving(true);
-
-    // Resolve user's primary login email address from Clerk
     const userEmail = user.primaryEmailAddress?.emailAddress;
+    const cleanUsername = modalUsername.trim().replace(/^@+/, "");
 
     try {
-      // Upsert profile data directly to Supabase including email
       const { error } = await supabase.from("profiles").upsert(
         {
           user_id: user.id,
-          username: modalUsername.trim(),
+          username: cleanUsername,
           name,
-          email: userEmail, // Saves user email address in Supabase
+          email: userEmail,
           role,
           bio,
           signature,
@@ -138,7 +175,6 @@ export default function HomeEditorModal({
         console.error("Supabase Save Error:", error.message);
         alert("Failed to save changes to database.");
       } else {
-        // Broadcast custom event so app/page.tsx re-fetches updated data
         window.dispatchEvent(new Event("profile-updated"));
         onClose();
       }
@@ -151,11 +187,17 @@ export default function HomeEditorModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl relative text-slate-900 dark:text-slate-100 max-h-[85vh] overflow-y-auto">
+    <div
+      onClick={onClose}
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl relative text-slate-900 dark:text-slate-100 max-h-[85vh] overflow-y-auto"
+      >
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-slate-400 hover:text-black dark:hover:text-white cursor-pointer"
+          className="absolute top-4 right-4 p-2 rounded-lg text-slate-400 hover:text-black dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
         >
           <X size={20} />
         </button>
@@ -174,7 +216,7 @@ export default function HomeEditorModal({
               type="text"
               value={modalUsername}
               onChange={(e) => setModalUsername(e.target.value)}
-              placeholder="e.g. olivia_wilson"
+              placeholder="e.g. your_username"
               className="w-full mt-1 p-2.5 border rounded-lg text-sm bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 font-mono"
             />
           </div>
@@ -224,7 +266,7 @@ export default function HomeEditorModal({
               type="text"
               value={signature || ""}
               onChange={(e) => setSignature(e.target.value)}
-              placeholder="e.g. Olivia Wilson"
+              placeholder="e.g. Signature"
               className="w-full mt-1 p-2.5 border rounded-lg text-sm bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 font-serif"
             />
           </div>

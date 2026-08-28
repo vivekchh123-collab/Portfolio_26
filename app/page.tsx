@@ -40,21 +40,15 @@ function HomeContent() {
 
   const [isLoading, setIsLoading] = useState(true);
 
-  // Username State
-  const [username, setUsername] = useState<string>("");
+  // Engagement & Link States
   const [copiedLink, setCopiedLink] = useState(false);
-
-  // View Mode State
-  const [viewedUser] = useState<string | null>(null);
-
-  // Engagement States
   const [isFollowing, setIsFollowing] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const [likeCount, setLikeCount] = useState(0);
   const [hasLiked, setHasLiked] = useState(false);
 
-  // Load Profile and Engagement Counts directly from Supabase
+  // Fetch Profile & Stats from Supabase cleanly
   const fetchPageProfile = useCallback(async () => {
     if (!targetUserId) {
       setIsLoading(false);
@@ -64,12 +58,13 @@ function HomeContent() {
     try {
       const { data, error } = await supabase
         .from("profiles")
-        .select("*")
+        .select(
+          "name, role, bio, signature, profile_img, follower_count, following_count, like_count",
+        )
         .eq("user_id", targetUserId)
         .single();
 
       if (data && !error) {
-        if (data.username) setUsername(data.username);
         if (data.name && profileContext?.setName)
           profileContext.setName(data.name);
         if (data.role && profileContext?.setRole)
@@ -79,6 +74,7 @@ function HomeContent() {
           profileContext.setSignature(data.signature);
         if (data.profile_img && profileContext?.setProfileImg)
           profileContext.setProfileImg(data.profile_img);
+
         if (typeof data.follower_count === "number")
           setFollowerCount(data.follower_count);
         if (typeof data.following_count === "number")
@@ -90,7 +86,7 @@ function HomeContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [targetUserId, profileContext]);
+  }, [targetUserId]);
 
   useEffect(() => {
     fetchPageProfile();
@@ -100,7 +96,7 @@ function HomeContent() {
       window.removeEventListener("profile-updated", fetchPageProfile);
   }, [fetchPageProfile]);
 
-  // Public Follow Handler - Using UPDATE instead of UPSERT
+  // Public Follow Handler
   const handleFollowToggle = async () => {
     if (!targetUserId) return;
 
@@ -129,7 +125,7 @@ function HomeContent() {
     }
   };
 
-  // Public Profile Like Handler - Using UPDATE instead of UPSERT
+  // Public Profile Like Handler
   const handleProfileLikeToggle = async () => {
     if (!targetUserId) return;
 
@@ -151,14 +147,14 @@ function HomeContent() {
         .eq("user_id", targetUserId);
 
       if (error) {
-        console.error("Failed to sync like count:", error.message);
+        console.error("Failed to sync profile like count:", error.message);
       }
     } catch (err) {
-      console.error("Like sync error:", err);
+      console.error("Profile like sync error:", err);
     }
   };
 
-  // Generate Direct Shareable Link with target ID
+  // Copy Direct Share Link
   const handleCopyShareLink = () => {
     if (typeof window !== "undefined") {
       const currentHost = window.location.origin;
@@ -173,8 +169,8 @@ function HomeContent() {
     }
   };
 
-  // Display states
-  const activeUserQuery = searchedUserFromUrl || viewedUser;
+  // Dynamic Fallbacks
+  const activeUserQuery = searchedUserFromUrl;
   const fallbackName = user?.fullName || "Portfolio Owner";
   const fallbackSignature = user?.firstName || "Signature";
   const fallbackImage = user?.imageUrl || DEFAULT_AVATAR;
@@ -189,7 +185,9 @@ function HomeContent() {
 
   const activeProfileImg = profileContext?.profileImg || fallbackImage;
 
-  const isViewingGuest = Boolean(activeUserQuery);
+  const isViewingGuest = Boolean(
+    activeUserQuery || (viewUserId && viewUserId !== user?.id),
+  );
 
   return (
     <>
@@ -211,7 +209,7 @@ function HomeContent() {
                       <button
                         onClick={handleCopyShareLink}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/80 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-700 transition cursor-pointer shadow-xs"
-                        title="Copy Direct HTTP Link"
+                        title="Copy Direct Link"
                       >
                         {copiedLink ? (
                           <>

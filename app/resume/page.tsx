@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   Phone,
@@ -36,6 +36,7 @@ function ResumeContent() {
 
   // Read viewUser URL parameter for shareable link support
   const viewUserId = searchParams.get("viewUser");
+  const targetUserId = viewUserId || user?.id;
 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [passwordInput, setPasswordInput] = useState("");
@@ -54,46 +55,41 @@ function ResumeContent() {
   // Default Fallback Resume Data
   const defaultResume: ResumeData = {
     password: "1234",
-    name: user?.fullName || "Olivia Wilson",
-    role: "DESIGNER AND ARCHITECT",
+    name: user?.fullName || "Portfolio Owner",
+    role: "SOFTWARE ENGINEER & DEVELOPER",
     aboutMe:
-      "We use an About Me section to briefly introduce ourselves and help others understand our background, skills, interests, achievements, and goals. It creates a good first impression and allows visitors, recruiters, or clients to quickly know who we are and what we can offer.",
+      "Passionate developer with a strong focus on building scalable web applications, interactive user interfaces, and robust digital systems.",
     phone: "+91 9876543210",
-    email: user?.primaryEmailAddress?.emailAddress || "trackerrproo@gmail.com",
+    email: user?.primaryEmailAddress?.emailAddress || "contact@example.com",
     socials: [
       { id: "1", platform: "LinkedIn", url: "https://linkedin.com" },
-      { id: "2", platform: "Portfolio", url: "https://reallygreatsite.com" },
+      { id: "2", platform: "GitHub", url: "https://github.com" },
     ],
-    address: "123 Anywhere St., Any City, ST 12345",
+    address: "New Delhi, India",
     photoUrl:
       user?.imageUrl ||
       "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=1000&auto=format&fit=crop",
-    skills: ["Skill_1", "Skill_2", "Skill_3", "Skill_4"],
-    languages: ["Spanish", "English", "Italian"],
+    skills: [
+      "React / Next.js",
+      "TypeScript",
+      "Node.js",
+      "Supabase",
+      "Tailwind CSS",
+    ],
+    languages: ["English", "Hindi"],
     workExperience: [
       {
-        title: "Future Software Engineer",
-        company: "Vihub Inc.",
-        period: "2020 - 2025",
-        desc: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-      },
-      {
-        title: "ARCHITECT",
-        company: "Larana Company",
-        period: "2015 - 2020",
-        desc: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+        title: "Software Engineer",
+        company: "Tech Solutions",
+        period: "2023 - Present",
+        desc: "Designed and engineered full-stack web applications, APIs, and real-time database integrations.",
       },
     ],
     education: [
       {
-        degree: "BACHELOR OF DESIGN",
-        school: "Borcelle University",
-        period: "2008 - 2012",
-      },
-      {
-        degree: "BACHELOR OF ARCHITECTURE",
-        school: "Borcelle University",
-        period: "2005 - 2009",
+        degree: "Bachelor of Technology",
+        school: "Engineering University",
+        period: "2021 - 2025",
       },
     ],
   };
@@ -101,8 +97,7 @@ function ResumeContent() {
   const [resumeData, setResumeData] = useState<ResumeData>(defaultResume);
 
   // Fetch resume data directly from Supabase (target shared user or logged-in user)
-  const loadResumeDataFromSupabase = async () => {
-    const targetUserId = viewUserId || user?.id;
+  const loadResumeDataFromSupabase = useCallback(async () => {
     if (!targetUserId) {
       setIsLoading(false);
       return;
@@ -128,7 +123,7 @@ function ResumeContent() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [targetUserId]);
 
   useEffect(() => {
     loadResumeDataFromSupabase();
@@ -141,7 +136,7 @@ function ResumeContent() {
       window.removeEventListener("open-resume-editor", handleOpenEditor);
       window.removeEventListener("resume-updated", loadResumeDataFromSupabase);
     };
-  }, [user, viewUserId]);
+  }, [loadResumeDataFromSupabase]);
 
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -169,15 +164,11 @@ function ResumeContent() {
     setErrorMsg("");
 
     try {
-      const targetUserId = viewUserId || user?.id || "default";
+      const activeTargetId = targetUserId || "default";
 
       let targetOwnerEmail = user?.primaryEmailAddress?.emailAddress;
 
-      if (
-        !targetOwnerEmail &&
-        resumeData?.email &&
-        resumeData.email !== "trackerrproo@gmail.com"
-      ) {
+      if (!targetOwnerEmail && resumeData?.email) {
         targetOwnerEmail = resumeData.email;
       }
 
@@ -185,7 +176,7 @@ function ResumeContent() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          targetUserId,
+          targetUserId: activeTargetId,
           ownerEmail: targetOwnerEmail,
           visitorName,
           reason: requestReason,
@@ -213,7 +204,7 @@ function ResumeContent() {
     window.print();
   };
 
-  const formattedName = resumeData?.name || "Olivia Wilson";
+  const formattedName = resumeData?.name || user?.fullName || "Portfolio Owner";
   const nameParts = formattedName.split(" ");
   const firstName = nameParts[0] || "";
   const lastName = nameParts.slice(1).join(" ") || "";
@@ -251,8 +242,8 @@ function ResumeContent() {
                     <h2 className="text-xl font-bold">Request Sent!</h2>
                     <p className="text-xs text-slate-400 leading-relaxed">
                       Your request and contact details have been emailed
-                      directly to the profile job applicant. They will review
-                      your message and reach out to you if interested.
+                      directly to the profile owner. They will review your
+                      message and reach out to you if interested.
                     </p>
                   </div>
                 ) : mode === "password" ? (
@@ -331,7 +322,7 @@ function ResumeContent() {
                       </label>
                       <textarea
                         rows={2}
-                        placeholder="e.g. Hiring for Full-Stack role..."
+                        placeholder="e.g. Hiring for Software Engineer role..."
                         value={requestReason}
                         onChange={(e) => setReason(e.target.value)}
                         className="w-full p-2.5 border rounded-xl text-xs bg-slate-800/90 border-slate-700 text-white placeholder-slate-500 focus:outline-indigo-500 resize-none"
@@ -340,10 +331,10 @@ function ResumeContent() {
 
                     <div>
                       <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">
-                        Contact Number
+                        Contact Number / Email
                       </label>
                       <input
-                        type="tel"
+                        type="text"
                         placeholder="e.g. +1 234 567 8900"
                         value={visitorContact}
                         onChange={(e) => setVisitorContact(e.target.value)}
