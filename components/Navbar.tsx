@@ -16,49 +16,70 @@ import {
   Moon,
   FileText,
   ChevronDown,
-  Code2,
+  Globe,
   Layers,
   LogIn,
   UserPlus,
   Lock,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import CertificateIcon from "@/components/icons/CertificateIcon";
 import HomeEditorModal from "./editor/HomeEditorModal";
-import ProjectsEditorModal from "./editor/ProjectsEditorModal";
+import ProjectsEditorModal, {
+  CustomLinkItem,
+} from "./editor/ProjectsEditorModal";
+import CertificateEditorModal, {
+  CertificateItem,
+} from "./editor/CertificateEditorModal";
 import AppShowcaseEditorModal, {
   ProjectItem,
 } from "./editor/AppShowcaseEditorModal";
 import ResumeEditorModal, { ResumeData } from "./editor/ResumeEditorModal";
 
-const DEFAULT_GITHUB_URL = "https://github.com";
-const DEFAULT_LEETCODE_URL = "https://leetcode.com";
+const DEFAULT_LINKS: CustomLinkItem[] = [
+  {
+    id: "1",
+    title: "GitHub",
+    url: "https://github.com/vivekchh123-collab",
+    icon: "",
+  },
+  {
+    id: "2",
+    title: "LeetCode",
+    url: "https://leetcode.com/u/vivek_chaurasiya_14/",
+    icon: "",
+  },
+];
 
 function NavbarContent() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // Read viewUser parameter from current URL to maintain shareable link context
   const viewUserId = searchParams.get("viewUser");
   const queryParam = viewUserId ? `?viewUser=${viewUserId}` : "";
 
   const [isOpen, setIsOpen] = useState(false);
   const [isProjectsDropdownOpen, setIsProjectsDropdownOpen] = useState(false);
 
-  // Clerk Auth Hooks
   const { user, isSignedIn, isLoaded } = useUser();
   const { openSignIn } = useClerk();
 
-  // Target User ID for data loading
   const targetUserId = viewUserId || user?.id;
 
   // Editor Modal States
   const [isHomeEditModalOpen, setIsHomeEditModalOpen] = useState(false);
   const [isProjectsEditModalOpen, setIsProjectsEditModalOpen] = useState(false);
+  const [isCertificateModalOpen, setIsCertificateModalOpen] = useState(false);
   const [isAppShowcaseModalOpen, setIsAppShowcaseModalOpen] = useState(false);
   const [isResumeEditModalOpen, setIsResumeEditModalOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
 
-  // Helper function to guard editor actions
+  const [customLinks, setCustomLinks] =
+    useState<CustomLinkItem[]>(DEFAULT_LINKS);
+  const [certificates, setCertificates] = useState<CertificateItem[]>([]);
+  const [projects, setProjects] = useState<ProjectItem[]>([]);
+  const [resumeData, setResumeData] = useState<ResumeData>({});
+
   const handleProtectedAction = (action: () => void) => {
     setIsOpen(false);
     if (!isSignedIn) {
@@ -68,67 +89,28 @@ function NavbarContent() {
     }
   };
 
-  // Profile Links with explicit string types
-  const [githubUrl, setGithubUrl] = useState<string>(DEFAULT_GITHUB_URL);
-  const [leetcodeUrl, setLeetcodeUrl] = useState<string>(DEFAULT_LEETCODE_URL);
-
-  // Default Projects Fallback
-  const defaultProjects: ProjectItem[] = [
-    {
-      id: "1",
-      name: "Personal Performance Tracker",
-      description:
-        "Habit tracking and data visualization app analyzing daily routines and productivity trends.",
-      appUrl: "https://tracker-pro.example.com",
-      techStack: ["Next.js", "Node.js", "Prisma", "PostgreSQL"],
-      images: [],
-    },
-  ];
-
-  const [projects, setProjects] = useState<ProjectItem[]>(defaultProjects);
-
-  // Default Resume Fallback
-  const defaultResume: ResumeData = {
-    password: "",
-    name: "",
-    role: "",
-    aboutMe: "",
-    phone: "",
-    email: "",
-    socials: [],
-    address: "",
-    photoUrl: "",
-    skills: [],
-    languages: [],
-    workExperience: [],
-    education: [],
-  };
-
-  const [resumeData, setResumeData] = useState<ResumeData>(defaultResume);
-
-  // Stable Supabase fetch handler to prevent loop queries
   const loadSupabaseData = useCallback(async () => {
     if (!targetUserId) return;
 
     try {
       const { data, error } = await supabase
         .from("profiles")
-        .select("github_url, leetcode_url, projects, resume_data")
+        .select("custom_links, certificates, projects, resume_data")
         .eq("user_id", targetUserId)
         .single();
 
       if (data && !error) {
-        if (typeof data.github_url === "string" && data.github_url.trim()) {
-          setGithubUrl(data.github_url.trim());
-        }
-        if (typeof data.leetcode_url === "string" && data.leetcode_url.trim()) {
-          setLeetcodeUrl(data.leetcode_url.trim());
-        }
         if (
-          data.projects &&
-          Array.isArray(data.projects) &&
-          data.projects.length > 0
+          data.custom_links &&
+          Array.isArray(data.custom_links) &&
+          data.custom_links.length > 0
         ) {
+          setCustomLinks(data.custom_links);
+        }
+        if (data.certificates && Array.isArray(data.certificates)) {
+          setCertificates(data.certificates);
+        }
+        if (data.projects && Array.isArray(data.projects)) {
           setProjects(data.projects);
         }
         if (data.resume_data && typeof data.resume_data === "object") {
@@ -144,11 +126,13 @@ function NavbarContent() {
     loadSupabaseData();
 
     window.addEventListener("developer-links-updated", loadSupabaseData);
+    window.addEventListener("certificates-updated", loadSupabaseData);
     window.addEventListener("projects-updated", loadSupabaseData);
     window.addEventListener("resume-updated", loadSupabaseData);
 
     return () => {
       window.removeEventListener("developer-links-updated", loadSupabaseData);
+      window.removeEventListener("certificates-updated", loadSupabaseData);
       window.removeEventListener("projects-updated", loadSupabaseData);
       window.removeEventListener("resume-updated", loadSupabaseData);
     };
@@ -156,24 +140,6 @@ function NavbarContent() {
 
   const menuRef = useRef<HTMLDivElement>(null);
   const projectsRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    document.documentElement.classList.add("dark");
-  }, []);
-
-  // Protect global event triggers
-  useEffect(() => {
-    const handleOpenResume = () => {
-      if (!isSignedIn) {
-        openSignIn();
-      } else {
-        setIsResumeEditModalOpen(true);
-      }
-    };
-    window.addEventListener("open-resume-editor", handleOpenResume);
-    return () =>
-      window.removeEventListener("open-resume-editor", handleOpenResume);
-  }, [isSignedIn, openSignIn]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -201,128 +167,125 @@ function NavbarContent() {
     }
   };
 
-  const safeGithubHref = githubUrl?.startsWith("http")
-    ? githubUrl
-    : `https://${githubUrl || "github.com"}`;
-
-  const safeLeetcodeHref = leetcodeUrl?.startsWith("http")
-    ? leetcodeUrl
-    : `https://${leetcodeUrl || "leetcode.com"}`;
-
   return (
     <>
       <nav className="fixed top-0 left-0 right-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 transition-colors">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between gap-4">
-          {/* TOP-LEFT LOGO */}
+          {/* LOGO & MENU */}
           <div className="flex items-center gap-3 sm:gap-4">
             <div className="relative" ref={menuRef}>
               <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition flex items-center justify-center focus:outline-none cursor-pointer"
+                className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition flex items-center justify-center cursor-pointer"
               >
                 <svg
                   width="32"
                   height="32"
                   viewBox="0 0 100 100"
                   fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
                   className="text-black dark:text-white fill-current transition"
                 >
                   <path d="M 10 20 L 50 90 L 90 20 L 72 20 L 50 62 L 38 40 L 52 40 L 40 20 Z" />
                 </svg>
               </button>
 
-              {/* Logo Options */}
               {isOpen && (
                 <div className="absolute left-0 mt-2 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl py-2 z-50">
-                  {pathname === "/resume" ? (
-                    <button
-                      onClick={() =>
-                        handleProtectedAction(() =>
-                          setIsResumeEditModalOpen(true),
-                        )
-                      }
-                      className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition text-left cursor-pointer"
-                    >
-                      <div className="flex items-center gap-3">
-                        <FileText
-                          size={16}
-                          className="text-indigo-600 dark:text-indigo-400"
-                        />
-                        <span>Edit Resume Content</span>
-                      </div>
-                      {!isSignedIn && (
-                        <Lock size={14} className="text-amber-500" />
-                      )}
-                    </button>
-                  ) : pathname === "/projects" ? (
-                    <>
-                      <button
-                        onClick={() =>
-                          handleProtectedAction(() =>
-                            setIsAppShowcaseModalOpen(true),
-                          )
-                        }
-                        className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition text-left cursor-pointer"
-                      >
-                        <div className="flex items-center gap-3">
-                          <Layers
-                            size={16}
-                            className="text-indigo-600 dark:text-indigo-400"
-                          />
-                          <span>Edit Projects Showcase</span>
-                        </div>
-                        {!isSignedIn && (
-                          <Lock size={14} className="text-amber-500" />
-                        )}
-                      </button>
-                      <button
-                        onClick={() =>
-                          handleProtectedAction(() =>
-                            setIsProjectsEditModalOpen(true),
-                          )
-                        }
-                        className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition text-left cursor-pointer"
-                      >
-                        <div className="flex items-center gap-3">
-                          <Code2
-                            size={16}
-                            className="text-indigo-600 dark:text-indigo-400"
-                          />
-                          <span>Edit Developer Links</span>
-                        </div>
-                        {!isSignedIn && (
-                          <Lock size={14} className="text-amber-500" />
-                        )}
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      onClick={() =>
-                        handleProtectedAction(() =>
-                          setIsHomeEditModalOpen(true),
-                        )
-                      }
-                      className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition text-left cursor-pointer"
-                    >
-                      <div className="flex items-center gap-3">
-                        <Edit3
-                          size={16}
-                          className="text-indigo-600 dark:text-indigo-400"
-                        />
-                        <span>Edit Homepage Content</span>
-                      </div>
-                      {!isSignedIn && (
-                        <Lock size={14} className="text-amber-500" />
-                      )}
-                    </button>
-                  )}
+                  <button
+                    onClick={() =>
+                      handleProtectedAction(() => setIsHomeEditModalOpen(true))
+                    }
+                    className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition text-left cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Edit3
+                        size={16}
+                        className="text-indigo-600 dark:text-indigo-400"
+                      />
+                      <span>Edit Hero / About</span>
+                    </div>
+                    {!isSignedIn && (
+                      <Lock size={14} className="text-amber-500" />
+                    )}
+                  </button>
+
+                  <button
+                    onClick={() =>
+                      handleProtectedAction(() =>
+                        setIsAppShowcaseModalOpen(true),
+                      )
+                    }
+                    className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition text-left cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Layers
+                        size={16}
+                        className="text-indigo-600 dark:text-indigo-400"
+                      />
+                      <span>Edit Projects</span>
+                    </div>
+                    {!isSignedIn && <Lock size={14} />}
+                  </button>
+
+                  <button
+                    onClick={() =>
+                      handleProtectedAction(() =>
+                        setIsCertificateModalOpen(true),
+                      )
+                    }
+                    className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition text-left cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3">
+                      <CertificateIcon
+                        size={16}
+                        className="text-indigo-600 dark:text-indigo-400"
+                      />
+                      <span>Edit Certificates</span>
+                    </div>
+                    {!isSignedIn && <Lock size={14} />}
+                  </button>
+
+                  <button
+                    onClick={() =>
+                      handleProtectedAction(() =>
+                        setIsProjectsEditModalOpen(true),
+                      )
+                    }
+                    className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition text-left cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Globe
+                        size={16}
+                        className="text-indigo-600 dark:text-indigo-400"
+                      />
+                      <span>Edit Social / Dev Links</span>
+                    </div>
+                    {!isSignedIn && <Lock size={14} />}
+                  </button>
+
+                  <button
+                    onClick={() =>
+                      handleProtectedAction(() =>
+                        setIsResumeEditModalOpen(true),
+                      )
+                    }
+                    className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition text-left cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3">
+                      <FileText
+                        size={16}
+                        className="text-indigo-600 dark:text-indigo-400"
+                      />
+                      <span>Edit Resume</span>
+                    </div>
+                    {!isSignedIn && <Lock size={14} />}
+                  </button>
                 </div>
               )}
             </div>
           </div>
 
-          {/* TOP-RIGHT NAVIGATION & CLERK AUTH */}
+          {/* NAV LINKS */}
           <div className="flex gap-4 sm:gap-6 items-center font-medium text-slate-600 dark:text-slate-300 text-sm tracking-wide">
             <Link
               href={`/${queryParam}`}
@@ -331,6 +294,7 @@ function NavbarContent() {
               About Me
             </Link>
 
+            {/* PROJECTS & SOCIAL DROPDOWN */}
             <div className="relative flex items-center" ref={projectsRef}>
               <Link
                 href={`/projects${queryParam}`}
@@ -343,61 +307,59 @@ function NavbarContent() {
                 onClick={() =>
                   setIsProjectsDropdownOpen(!isProjectsDropdownOpen)
                 }
-                className="p-1 hover:text-black dark:hover:text-white transition focus:outline-none cursor-pointer ml-0.5"
+                className="p-1 hover:text-black dark:hover:text-white transition cursor-pointer ml-0.5"
               >
                 <ChevronDown
                   size={14}
-                  className={`transition-transform duration-200 ${
-                    isProjectsDropdownOpen ? "rotate-180" : ""
-                  }`}
+                  className={`transition-transform duration-200 ${isProjectsDropdownOpen ? "rotate-180" : ""}`}
                 />
               </button>
 
               {isProjectsDropdownOpen && (
-                <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl py-2 z-50">
-                  <a
-                    href={safeGithubHref}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => setIsProjectsDropdownOpen(false)}
-                    className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-                  >
-                    <div className="w-5 h-5 flex items-center justify-center rounded-full bg-black dark:bg-white text-white dark:text-black p-0.5">
-                      <svg
-                        viewBox="0 0 24 24"
-                        className="w-full h-full fill-current"
+                <div className="absolute right-0 top-full mt-2 w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl py-2 z-50">
+                  {customLinks.map((link) => {
+                    const safeHref = link.url.startsWith("http")
+                      ? link.url
+                      : `https://${link.url}`;
+                    return (
+                      <a
+                        key={link.id}
+                        href={safeHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => setIsProjectsDropdownOpen(false)}
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
                       >
-                        <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
-                      </svg>
-                    </div>
-                    <span>GitHub</span>
-                  </a>
-
-                  <a
-                    href={safeLeetcodeHref}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => setIsProjectsDropdownOpen(false)}
-                    className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-                  >
-                    <div className="w-5 h-5 flex items-center justify-center">
-                      <svg viewBox="0 0 24 24" className="w-full h-full">
-                        <path
-                          fill="#FFA116"
-                          d="M16.102 17.93l-2.697 2.607c-.466.451-1.211.451-1.677 0l-7.231-6.992a3.864 3.864 0 010-5.462l7.23-6.992c.466-.451 1.212-.451 1.678 0l2.697 2.607a1.189 1.189 0 010 1.681l-4.717 4.561a1.189 1.189 0 000 1.681l4.717 4.561a1.189 1.189 0 010 1.681z"
-                        />
-                        <path
-                          fill="#282828"
-                          className="dark:fill-white transition"
-                          d="M10.887 12.841h9.113c.656 0 1.188-.532 1.188-1.188s-.532-1.188-1.188-1.188h-9.113c-.656 0-1.188.532-1.188 1.188s.532 1.188 1.188 1.188z"
-                        />
-                      </svg>
-                    </div>
-                    <span>LeetCode</span>
-                  </a>
+                        <div className="w-5 h-5 flex items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden shrink-0 border border-slate-200 dark:border-slate-700">
+                          {link.icon ? (
+                            <img
+                              src={link.icon}
+                              alt={link.title}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <Globe size={13} className="text-slate-500" />
+                          )}
+                        </div>
+                        <span className="truncate">{link.title}</span>
+                      </a>
+                    );
+                  })}
                 </div>
               )}
             </div>
+
+            {/* CERTIFICATE LINK WITH CUSTOM BADGE */}
+            <Link
+              href={`/certificates${queryParam}`}
+              className="flex items-center gap-1.5 hover:text-black dark:hover:text-white transition"
+            >
+              <CertificateIcon
+                size={16}
+                className="text-indigo-600 dark:text-indigo-400"
+              />
+              <span>Certificates</span>
+            </Link>
 
             <Link
               href={`/resume${queryParam}`}
@@ -406,13 +368,9 @@ function NavbarContent() {
               Resume
             </Link>
 
-            {/* Dark Mode Toggle */}
             <button
               onClick={toggleDarkMode}
               className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 transition text-slate-700 dark:text-slate-200 cursor-pointer"
-              title={
-                isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"
-              }
             >
               {isDarkMode ? (
                 <Sun size={18} className="text-amber-400" />
@@ -421,55 +379,50 @@ function NavbarContent() {
               )}
             </button>
 
-            {/* SEPARATED LOG IN & SIGN UP BUTTONS */}
             {isLoaded && !isSignedIn && (
               <div className="flex items-center gap-2">
                 <SignInButton mode="modal">
-                  <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold transition cursor-pointer border border-transparent hover:border-slate-300 dark:hover:border-slate-700">
-                    <LogIn size={14} />
-                    <span>Log In</span>
+                  <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold transition cursor-pointer">
+                    <LogIn size={14} /> Log In
                   </button>
                 </SignInButton>
-
                 <SignUpButton mode="modal">
                   <button className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition shadow-sm cursor-pointer">
-                    <UserPlus size={14} />
-                    <span>Sign Up</span>
+                    <UserPlus size={14} /> Sign Up
                   </button>
                 </SignUpButton>
               </div>
             )}
 
-            {/* Logged-In User Avatar */}
             {isLoaded && isSignedIn && <UserButton />}
           </div>
         </div>
       </nav>
 
-      {/* Editor Components */}
       {isSignedIn && (
         <>
           <HomeEditorModal
             isOpen={isHomeEditModalOpen}
             onClose={() => setIsHomeEditModalOpen(false)}
           />
-
           <ProjectsEditorModal
             isOpen={isProjectsEditModalOpen}
             onClose={() => setIsProjectsEditModalOpen(false)}
-            githubUrl={githubUrl}
-            setGithubUrl={setGithubUrl}
-            leetcodeUrl={leetcodeUrl}
-            setLeetcodeUrl={setLeetcodeUrl}
+            customLinks={customLinks}
+            setCustomLinks={setCustomLinks}
           />
-
+          <CertificateEditorModal
+            isOpen={isCertificateModalOpen}
+            onClose={() => setIsCertificateModalOpen(false)}
+            certificates={certificates}
+            setCertificates={setCertificates}
+          />
           <AppShowcaseEditorModal
             isOpen={isAppShowcaseModalOpen}
             onClose={() => setIsAppShowcaseModalOpen(false)}
             projects={projects}
             setProjects={setProjects}
           />
-
           <ResumeEditorModal
             isOpen={isResumeEditModalOpen}
             onClose={() => setIsResumeEditModalOpen(false)}
