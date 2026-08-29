@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { X, Plus, Trash2, Upload, Globe, HelpCircle } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { X, Plus, Trash2, Upload, Globe } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -9,7 +9,7 @@ export interface CustomLinkItem {
   id: string;
   title: string;
   url: string;
-  icon?: string; // Small image URL or Base64
+  icon?: string;
 }
 
 interface ProjectsEditorModalProps {
@@ -22,56 +22,80 @@ interface ProjectsEditorModalProps {
 export default function ProjectsEditorModal({
   isOpen,
   onClose,
-  customLinks: externalLinks = [],
+  customLinks: externalLinks,
   setCustomLinks: externalSetLinks,
 }: ProjectsEditorModalProps) {
   const { user } = useUser();
   const [isSaving, setIsSaving] = useState(false);
-  const [links, setLinks] = useState<CustomLinkItem[]>(externalLinks);
+  const [links, setLinks] = useState<CustomLinkItem[]>([]);
+
+  // Ref to prevent background re-fetching from overwriting active edits
+  const hasLoadedRef = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
-    if (isOpen && user?.id) {
-      async function fetchLinks() {
-        try {
-          const { data, error } = await supabase
-            .from("profiles")
-            .select("custom_links")
-            .eq("user_id", user?.id)
-            .single();
 
-          if (
-            isMounted &&
-            data?.custom_links &&
-            Array.isArray(data.custom_links) &&
-            !error
-          ) {
-            setLinks(data.custom_links);
-            if (externalSetLinks) externalSetLinks(data.custom_links);
-          } else if (isMounted && externalLinks.length > 0) {
-            setLinks(externalLinks);
+    if (isOpen) {
+      if (!hasLoadedRef.current) {
+        // 1. Initialize with external state if available
+        if (externalLinks && externalLinks.length > 0) {
+          setLinks(externalLinks);
+        }
+
+        // 2. Load latest database values once on modal open
+        if (user?.id) {
+          async function fetchLinks() {
+            try {
+              const { data, error } = await supabase
+                .from("profiles")
+                .select("custom_links")
+                .eq("user_id", user?.id)
+                .single();
+
+              if (
+                isMounted &&
+                data?.custom_links &&
+                Array.isArray(data.custom_links) &&
+                !error
+              ) {
+                setLinks(data.custom_links);
+              }
+            } catch (err) {
+              console.error("Failed to load custom links:", err);
+            } finally {
+              if (isMounted) {
+                hasLoadedRef.current = true;
+              }
+            }
           }
-        } catch (err) {
-          console.error("Failed to load custom links:", err);
+          fetchLinks();
+        } else {
+          hasLoadedRef.current = true;
         }
       }
-      fetchLinks();
+    } else {
+      // Reset load lock on close
+      hasLoadedRef.current = false;
     }
+
     return () => {
       isMounted = false;
     };
-  }, [isOpen, user]);
+  }, [isOpen, user?.id, externalLinks]);
 
+  // Modal Escape key and body scroll freeze
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
+
     if (isOpen) {
       document.body.style.overflow = "hidden";
       window.addEventListener("keydown", handleKeyDown);
     } else {
       document.body.style.overflow = "";
     }
+
     return () => {
       document.body.style.overflow = "";
       window.removeEventListener("keydown", handleKeyDown);
@@ -83,8 +107,8 @@ export default function ProjectsEditorModal({
   const handleAddLink = () => {
     const newLink: CustomLinkItem = {
       id: Date.now().toString(),
-      title: "LinkedIn",
-      url: "https://linkedin.com/in/",
+      title: "New Platform",
+      url: "https://",
       icon: "",
     };
     setLinks((prev) => [...prev, newLink]);

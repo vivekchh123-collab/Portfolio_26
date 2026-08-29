@@ -36,28 +36,20 @@ function ProjectsContent() {
   const { user, isSignedIn } = useUser();
   const searchParams = useSearchParams();
 
-  // Read viewUser URL parameter to support shareable link view
   const viewUserId = searchParams.get("viewUser");
   const targetUserId = viewUserId || user?.id;
-
-  // Check if current logged-in user is the owner of this profile
   const isOwner = Boolean(isSignedIn && user && targetUserId === user.id);
 
-  // Loading State
   const [isLoading, setIsLoading] = useState(true);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
 
-  // Engagement States per Project
   const [likesMap, setLikesMap] = useState<Record<string, number>>({});
   const [userLikesMap, setUserLikesMap] = useState<Record<string, boolean>>({});
   const [commentsMap, setCommentsMap] = useState<Record<string, Comment[]>>({});
-
-  // Active Selected Image Index per Project
   const [activeImageIndexMap, setActiveImageIndexMap] = useState<
     Record<string, number>
   >({});
 
-  // Fullscreen Lightbox Modal State
   const [lightboxState, setLightboxState] = useState<{
     isOpen: boolean;
     projectId: string | null;
@@ -68,7 +60,6 @@ function ProjectsContent() {
     imageIndex: 0,
   });
 
-  // UI state for active comment box and share feedback
   const [activeCommentProjectId, setActiveCommentProjectId] = useState<
     string | null
   >(null);
@@ -76,7 +67,6 @@ function ProjectsContent() {
   const [authorNameInput, setAuthorNameInput] = useState("");
   const [copiedShareId, setCopiedShareId] = useState<string | null>(null);
 
-  // Default fallback project
   const defaultProjects: ProjectItem[] = [
     {
       id: "1",
@@ -93,7 +83,6 @@ function ProjectsContent() {
 
   const [projects, setProjects] = useState<ProjectItem[]>(defaultProjects);
 
-  // Fetch Projects and Engagements from Supabase
   const loadProjectsData = useCallback(async () => {
     if (!targetUserId) {
       setIsLoading(false);
@@ -143,7 +132,6 @@ function ProjectsContent() {
     };
   }, [loadProjectsData]);
 
-  // Save Engagements to Supabase publicly using UPDATE
   const syncEngagementsToSupabase = async (
     updatedLikes: Record<string, number>,
     updatedUserLikes: Record<string, boolean>,
@@ -152,7 +140,7 @@ function ProjectsContent() {
     if (!targetUserId) return;
 
     try {
-      const { error } = await supabase
+      await supabase
         .from("profiles")
         .update({
           project_likes_map: updatedLikes,
@@ -161,16 +149,11 @@ function ProjectsContent() {
           updated_at: new Date().toISOString(),
         })
         .eq("user_id", targetUserId);
-
-      if (error) {
-        console.error("Supabase engagement sync error:", error.message);
-      }
     } catch (err) {
       console.error("Failed to sync project engagements:", err);
     }
   };
 
-  // Handle Like Toggle
   const handleLikeToggle = (projectId: string) => {
     const hasLiked = !!userLikesMap[projectId];
     const currentLikes = likesMap[projectId] || 0;
@@ -183,11 +166,9 @@ function ProjectsContent() {
     const updatedLikesMap = { ...likesMap, [projectId]: nextLikes };
     const updatedUserLikesMap = { ...userLikesMap, [projectId]: nextUserLikes };
 
-    // Update UI state immediately
     setLikesMap(updatedLikesMap);
     setUserLikesMap(updatedUserLikesMap);
 
-    // Sync to Supabase
     syncEngagementsToSupabase(
       updatedLikesMap,
       updatedUserLikesMap,
@@ -195,7 +176,6 @@ function ProjectsContent() {
     );
   };
 
-  // Handle Add Comment
   const handleAddComment = (projectId: string, e: React.FormEvent) => {
     e.preventDefault();
     if (!commentInput.trim()) return;
@@ -213,11 +193,9 @@ function ProjectsContent() {
 
     setCommentsMap(updatedCommentsMap);
     syncEngagementsToSupabase(likesMap, userLikesMap, updatedCommentsMap);
-
     setCommentInput("");
   };
 
-  // OWNER-ONLY: Delete Comment Handler
   const handleDeleteComment = (projectId: string, commentId: string) => {
     if (!isOwner) return;
 
@@ -232,7 +210,6 @@ function ProjectsContent() {
     syncEngagementsToSupabase(likesMap, userLikesMap, updatedCommentsMap);
   };
 
-  // Switch Active Image Card Display
   const handleSelectImage = (projectId: string, index: number) => {
     setActiveImageIndexMap((prev) => ({
       ...prev,
@@ -240,7 +217,6 @@ function ProjectsContent() {
     }));
   };
 
-  // Native Web Share API + Clipboard Fallback
   const handleShare = async (project: ProjectItem) => {
     const shareUrl = project.appUrl?.startsWith("http")
       ? project.appUrl
@@ -258,7 +234,7 @@ function ProjectsContent() {
       try {
         await navigator.share(shareData);
       } catch (err) {
-        console.log("Share cancelled or failed", err);
+        console.log("Share cancelled", err);
       }
     } else {
       navigator.clipboard.writeText(shareUrl);
@@ -267,16 +243,17 @@ function ProjectsContent() {
     }
   };
 
-  // Lightbox Modal Project & Active Image Helper
   const activeLightboxProject = projects.find(
     (p) => p.id === lightboxState.projectId,
   );
   const activeLightboxImages = activeLightboxProject?.images || [];
 
+  if (isLoading) {
+    return <ProjectSkeleton />;
+  }
+
   return (
     <>
-      {isLoading && <ProjectSkeleton />}
-
       <main className="min-h-[calc(100vh-5rem)] pt-24 pb-12 flex flex-col items-center justify-center text-slate-900 dark:text-slate-100 transition-colors">
         <div className="w-full max-w-6xl mx-auto space-y-12 flex flex-col items-center">
           <div className="w-full space-y-12 flex flex-col items-center">
@@ -292,7 +269,10 @@ function ProjectsContent() {
                   : [
                       "https://images.unsplash.com/photo-1551288049-bebda4e38f71?q=80&w=1000&auto=format&fit=crop",
                     ];
-              const activeImgIdx = activeImageIndexMap[project.id] || 0;
+
+              // Prevent index out of bounds when images are deleted
+              const savedIdx = activeImageIndexMap[project.id] || 0;
+              const activeImgIdx = savedIdx >= images.length ? 0 : savedIdx;
               const currentImg = images[activeImgIdx] || images[0];
 
               return (
@@ -325,7 +305,7 @@ function ProjectsContent() {
                     </div>
                   </div>
 
-                  {/* MIDDLE SECTION: MAIN PREVIEW WITH MULTI-IMAGE SWITCHER */}
+                  {/* PREVIEW GALLERY */}
                   <div className="space-y-3">
                     <div
                       onClick={() =>
@@ -349,7 +329,6 @@ function ProjectsContent() {
                       </div>
                     </div>
 
-                    {/* THUMBNAIL IMAGE SWITCHER */}
                     {images.length > 1 && (
                       <div className="flex items-center gap-3 overflow-x-auto pb-1 pt-1">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
@@ -376,7 +355,7 @@ function ProjectsContent() {
                     )}
                   </div>
 
-                  {/* BOTTOM DETAILS: ABOUT & TECH STACK */}
+                  {/* DETAILS */}
                   <div className="space-y-6 pt-2">
                     <div className="space-y-1">
                       <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
@@ -405,7 +384,7 @@ function ProjectsContent() {
                       </div>
                     )}
 
-                    {/* INTERACTIVE ACTIONS BAR */}
+                    {/* ACTIONS */}
                     <div className="pt-4 border-t border-slate-300/40 dark:border-slate-800 flex items-center justify-between gap-4">
                       <div className="flex items-center gap-4">
                         <button
@@ -472,7 +451,6 @@ function ProjectsContent() {
                           </button>
                         </div>
 
-                        {/* Add Comment Form */}
                         <form
                           onSubmit={(e) => handleAddComment(project.id, e)}
                           className="space-y-2 bg-white/70 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-200 dark:border-slate-700/60"
@@ -502,7 +480,6 @@ function ProjectsContent() {
                           </div>
                         </form>
 
-                        {/* Comment Feed */}
                         <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                           {projectComments.length > 0 ? (
                             projectComments.map((comment) => (
@@ -532,7 +509,7 @@ function ProjectsContent() {
                                       )
                                     }
                                     className="absolute top-3 right-3 text-slate-400 hover:text-rose-500 transition cursor-pointer"
-                                    title="Delete Comment (Owner Only)"
+                                    title="Delete Comment"
                                   >
                                     <Trash2 size={14} />
                                   </button>
@@ -555,7 +532,7 @@ function ProjectsContent() {
           </div>
         </div>
 
-        {/* --- FULLSCREEN LIGHTBOX MODAL --- */}
+        {/* LIGHTBOX */}
         {lightboxState.isOpen && activeLightboxProject && (
           <div
             onClick={() =>
@@ -567,7 +544,6 @@ function ProjectsContent() {
             }
             className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-md flex flex-col justify-between p-4 sm:p-6 animate-in fade-in duration-200 select-none overflow-hidden"
           >
-            {/* TOP HEADER BAR */}
             <div
               onClick={(e) => e.stopPropagation()}
               className="w-full flex justify-between items-center bg-slate-900/90 border border-slate-800 px-5 py-3 rounded-2xl text-white max-w-6xl mx-auto shadow-2xl shrink-0"
@@ -590,13 +566,11 @@ function ProjectsContent() {
                   })
                 }
                 className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
-                title="Close View"
               >
                 <X size={20} />
               </button>
             </div>
 
-            {/* MAIN IMAGE CONTAINER */}
             <div
               onClick={(e) => e.stopPropagation()}
               className="relative flex-1 w-full max-w-6xl mx-auto my-3 flex items-center justify-center overflow-hidden"
@@ -639,8 +613,7 @@ function ProjectsContent() {
               )}
             </div>
 
-            {/* BOTTOM THUMBNAILS BAR */}
-            {activeLightboxImages.length > 1 ? (
+            {activeLightboxImages.length > 1 && (
               <div
                 onClick={(e) => e.stopPropagation()}
                 className="w-full flex justify-center shrink-0"
@@ -670,13 +643,10 @@ function ProjectsContent() {
                   ))}
                 </div>
               </div>
-            ) : (
-              <div className="h-2 shrink-0" />
             )}
           </div>
         )}
 
-        {/* Editor Modal Component */}
         <AppShowcaseEditorModal
           isOpen={isEditorOpen}
           onClose={() => setIsEditorOpen(false)}

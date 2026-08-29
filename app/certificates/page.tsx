@@ -17,11 +17,10 @@ import {
 } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { supabase } from "@/lib/supabaseClient";
-import CertificateIcon from "@/components/icons/CertificateIcon";
 import CertificateEditorModal, {
   CertificateItem,
 } from "@/components/editor/CertificateEditorModal";
-import ProjectSkeleton from "@/components/Loading/ProjectSkeleton";
+import CertificateSkeleton from "@/components/Loading/CertificateSkeleton";
 
 export const dynamic = "force-dynamic";
 
@@ -223,397 +222,406 @@ function CertificatesContent() {
   );
   const activeLightboxImages = activeLightboxCert?.images || [];
 
+  if (isLoading) {
+    return <CertificateSkeleton />;
+  }
+
   return (
-    <>
-      {isLoading && <ProjectSkeleton />}
-
-      <main className="min-h-[calc(100vh-5rem)] pt-24 pb-12 flex flex-col items-center justify-center text-slate-900 dark:text-slate-100 transition-colors">
-        <div className="w-full max-w-6xl mx-auto space-y-12 flex flex-col items-center">
-          <div className="w-full space-y-12 flex flex-col items-center">
-            {certificates.map((cert) => {
-              const certLikes = likesMap[cert.id] || 0;
-              const isLiked = !!userLikesMap[cert.id];
-              const certComments = commentsMap[cert.id] || [];
-              const isCommentBoxOpen = activeCommentCertId === cert.id;
-
-              const images =
-                cert.images && cert.images.length > 0
-                  ? cert.images
-                  : [
-                      "https://images.unsplash.com/photo-1589330694653-ded6df03f754?q=80&w=1000&auto=format&fit=crop",
-                    ];
-              const activeImgIdx = activeImageIndexMap[cert.id] || 0;
-              const currentImg = images[activeImgIdx] || images[0];
-
-              return (
-                <div
-                  key={cert.id}
-                  className="w-full max-w-6xl bg-sky-100/60 dark:bg-slate-900/60 border border-sky-200/60 dark:border-slate-800 rounded-3xl p-8 sm:p-10 shadow-2xl transition-colors space-y-6 flex flex-col justify-between min-h-[520px]"
-                >
-                  {/* HEADER */}
-                  <div className="flex flex-wrap items-center justify-between gap-4">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-bold text-xs uppercase tracking-wider">
-                        <CertificateIcon size={18} />
-                        <span>
-                          {cert.issuer} • {cert.issueDate}
-                        </span>
-                      </div>
-                      <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-                        {cert.title}
-                      </h1>
-                    </div>
-
-                    {cert.credentialUrl && (
-                      <a
-                        href={
-                          cert.credentialUrl.startsWith("http")
-                            ? cert.credentialUrl
-                            : `https://${cert.credentialUrl}`
-                        }
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-white dark:bg-slate-100 hover:bg-slate-100 dark:hover:bg-white text-slate-900 font-bold text-xs transition shadow-md border border-slate-200 dark:border-slate-100"
-                      >
-                        <span>Verify Credential</span>
-                        <ExternalLink size={15} />
-                      </a>
-                    )}
-                  </div>
-
-                  {/* CERTIFICATE PREVIEW GALLERY */}
-                  <div className="space-y-3">
-                    <div
-                      onClick={() =>
-                        setLightboxState({
-                          isOpen: true,
-                          certId: cert.id,
-                          imageIndex: activeImgIdx,
-                        })
-                      }
-                      className="relative w-full h-72 sm:h-80 md:h-96 rounded-2xl overflow-hidden bg-slate-950 border border-slate-200/50 dark:border-slate-800 shadow-inner group cursor-pointer"
-                    >
-                      <img
-                        src={currentImg}
-                        alt={cert.title}
-                        className="w-full h-full object-contain p-2 hover:scale-102 transition duration-500"
-                      />
-                      <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition duration-300 flex items-center justify-center gap-2 text-white font-medium text-xs backdrop-blur-[2px]">
-                        <Maximize2 size={18} />
-                        <span>Click to view full certificate</span>
-                      </div>
-                    </div>
-
-                    {images.length > 1 && (
-                      <div className="flex items-center gap-3 overflow-x-auto pb-1 pt-1">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                          Credentials ({images.length}):
-                        </span>
-                        {images.map((img, idx) => (
-                          <button
-                            key={idx}
-                            onClick={() =>
-                              setActiveImageIndexMap((prev) => ({
-                                ...prev,
-                                [cert.id]: idx,
-                              }))
-                            }
-                            className={`relative w-16 h-12 rounded-lg overflow-hidden border-2 transition cursor-pointer shrink-0 ${
-                              activeImgIdx === idx
-                                ? "border-sky-500 scale-105 shadow-md"
-                                : "border-slate-300 dark:border-slate-700 opacity-60 hover:opacity-100"
-                            }`}
-                          >
-                            <img
-                              src={img}
-                              alt="Thumb"
-                              className="w-full h-full object-cover"
-                            />
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* ABOUT CERTIFICATE */}
-                  <div className="space-y-6 pt-2">
-                    <div className="space-y-1">
-                      <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
-                        CREDENTIAL DETAILS
-                      </h3>
-                      <p className="text-sm sm:text-base text-slate-700 dark:text-slate-300 leading-relaxed font-medium">
-                        {cert.description}
-                      </p>
-                    </div>
-
-                    {/* ACTIONS BAR */}
-                    <div className="pt-4 border-t border-slate-300/40 dark:border-slate-800 flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-4">
-                        <button
-                          onClick={() => handleLikeToggle(cert.id)}
-                          className={`flex items-center gap-2 px-4 py-2 rounded-xl transition shadow-xs cursor-pointer border text-xs font-bold ${
-                            isLiked
-                              ? "bg-rose-500 text-white border-rose-500"
-                              : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-rose-500 hover:bg-rose-50 dark:hover:bg-slate-700"
-                          }`}
-                        >
-                          <Heart
-                            size={16}
-                            className={isLiked ? "fill-white" : "fill-rose-500"}
-                          />
-                          <span>{certLikes} Likes</span>
-                        </button>
-
-                        <button
-                          onClick={() =>
-                            setActiveCommentCertId(
-                              isCommentBoxOpen ? null : cert.id,
-                            )
-                          }
-                          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-slate-700 text-xs font-bold transition cursor-pointer shadow-xs"
-                        >
-                          <MessageSquare size={16} />
-                          <span>{certComments.length} Comments</span>
-                        </button>
-                      </div>
-
-                      <button
-                        onClick={() => handleShare(cert)}
-                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-white text-white dark:text-slate-900 text-xs font-bold transition cursor-pointer shadow-md"
-                      >
-                        {copiedShareId === cert.id ? (
-                          <>
-                            <Check
-                              size={15}
-                              className="text-emerald-400 dark:text-emerald-600"
-                            />
-                            <span>Link Copied!</span>
-                          </>
-                        ) : (
-                          <>
-                            <Share2 size={15} />
-                            <span>Share</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-
-                    {/* COMMENTS DRAWER */}
-                    {isCommentBoxOpen && (
-                      <div className="pt-4 border-t border-slate-200 dark:border-slate-800 space-y-4 animate-in fade-in duration-200">
-                        <div className="flex justify-between items-center">
-                          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                            Endorsements & Comments ({certComments.length})
-                          </h4>
-                          <button
-                            onClick={() => setActiveCommentCertId(null)}
-                            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
-                          >
-                            <X size={16} />
-                          </button>
-                        </div>
-
-                        <form
-                          onSubmit={(e) => handleAddComment(cert.id, e)}
-                          className="space-y-2 bg-white/70 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-200 dark:border-slate-700/60"
-                        >
-                          <input
-                            type="text"
-                            placeholder="Your Name (optional)"
-                            value={authorNameInput}
-                            onChange={(e) => setAuthorNameInput(e.target.value)}
-                            className="w-full p-2 border rounded-xl text-xs bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 focus:outline-indigo-600"
-                          />
-                          <div className="flex gap-2">
-                            <input
-                              type="text"
-                              placeholder="Leave an endorsement or review..."
-                              value={commentInput}
-                              onChange={(e) => setCommentInput(e.target.value)}
-                              className="flex-1 p-2.5 border rounded-xl text-xs bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 focus:outline-indigo-600"
-                            />
-                            <button
-                              type="submit"
-                              className="flex items-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs rounded-xl transition cursor-pointer"
-                            >
-                              <Send size={13} />
-                              <span>Post</span>
-                            </button>
-                          </div>
-                        </form>
-
-                        <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                          {certComments.length > 0 ? (
-                            certComments.map((comment) => (
-                              <div
-                                key={comment.id}
-                                className="p-3 bg-white/80 dark:bg-slate-800/80 rounded-xl border border-slate-200/60 dark:border-slate-700/60 text-xs space-y-1 relative group"
-                              >
-                                <div className="flex justify-between items-center pr-6">
-                                  <span className="font-bold text-indigo-600 dark:text-indigo-400">
-                                    {comment.author}
-                                  </span>
-                                  <span className="text-[10px] text-slate-400">
-                                    {comment.timestamp}
-                                  </span>
-                                </div>
-                                <p className="text-slate-700 dark:text-slate-300">
-                                  {comment.text}
-                                </p>
-                                {isOwner && (
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      handleDeleteComment(cert.id, comment.id)
-                                    }
-                                    className="absolute top-3 right-3 text-slate-400 hover:text-rose-500 transition cursor-pointer"
-                                  >
-                                    <Trash2 size={14} />
-                                  </button>
-                                )}
-                              </div>
-                            ))
-                          ) : (
-                            <p className="text-xs text-slate-400 italic text-center py-2">
-                              No comments yet. Be the first to endorse!
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+    <main className="min-h-[calc(100vh-5rem)] pt-24 pb-12 flex flex-col items-center justify-center text-slate-900 dark:text-slate-100 transition-colors">
+      <div className="w-full max-w-6xl mx-auto space-y-10 flex flex-col items-center px-4 sm:px-0">
+        {/* TOP TITLE HEADER (Icon Removed) */}
+        <div className="w-full flex items-center justify-start border-b border-slate-200 dark:border-slate-800 pb-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">
+              Certificates &amp; Credentials
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+              Verified certifications, courses, and accredited achievements
+            </p>
           </div>
         </div>
 
-        {/* LIGHTBOX MODAL */}
-        {lightboxState.isOpen && activeLightboxCert && (
-          <div
-            onClick={() =>
-              setLightboxState({ isOpen: false, certId: null, imageIndex: 0 })
-            }
-            className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-md flex flex-col justify-between p-4 sm:p-6 animate-in fade-in duration-200 select-none overflow-hidden"
-          >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              className="w-full flex justify-between items-center bg-slate-900/90 border border-slate-800 px-5 py-3 rounded-2xl text-white max-w-6xl mx-auto shadow-2xl shrink-0"
-            >
-              <div>
-                <h3 className="text-sm sm:text-base font-bold leading-tight">
-                  {activeLightboxCert.title}
-                </h3>
-                <p className="text-[11px] text-slate-400">
-                  Accredited by {activeLightboxCert.issuer} (
-                  {lightboxState.imageIndex + 1} of{" "}
-                  {activeLightboxImages.length})
-                </p>
-              </div>
-              <button
-                onClick={() =>
-                  setLightboxState({
-                    isOpen: false,
-                    certId: null,
-                    imageIndex: 0,
-                  })
-                }
-                className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
-              >
-                <X size={20} />
-              </button>
-            </div>
+        {/* CERTIFICATES LIST */}
+        <div className="w-full space-y-12 flex flex-col items-center">
+          {certificates.map((cert) => {
+            const certLikes = likesMap[cert.id] || 0;
+            const isLiked = !!userLikesMap[cert.id];
+            const certComments = commentsMap[cert.id] || [];
+            const isCommentBoxOpen = activeCommentCertId === cert.id;
 
-            <div
-              onClick={(e) => e.stopPropagation()}
-              className="relative flex-1 w-full max-w-6xl mx-auto my-3 flex items-center justify-center overflow-hidden"
-            >
-              {activeLightboxImages.length > 1 && (
-                <button
-                  onClick={() =>
-                    setLightboxState((prev) => ({
-                      ...prev,
-                      imageIndex:
-                        (prev.imageIndex - 1 + activeLightboxImages.length) %
-                        activeLightboxImages.length,
-                    }))
-                  }
-                  className="absolute left-2 sm:left-4 z-30 p-3 rounded-full bg-black/70 hover:bg-black text-white border border-white/20 transition cursor-pointer shadow-xl"
-                >
-                  <ChevronLeft size={24} />
-                </button>
-              )}
+            const images =
+              cert.images && cert.images.length > 0
+                ? cert.images
+                : [
+                    "https://images.unsplash.com/photo-1589330694653-ded6df03f754?q=80&w=1000&auto=format&fit=crop",
+                  ];
+            const activeImgIdx = activeImageIndexMap[cert.id] || 0;
+            const currentImg = images[activeImgIdx] || images[0];
 
-              <img
-                src={activeLightboxImages[lightboxState.imageIndex]}
-                alt={activeLightboxCert.title}
-                className="max-w-full max-h-full object-contain rounded-xl shadow-2xl border border-slate-800"
-              />
-
-              {activeLightboxImages.length > 1 && (
-                <button
-                  onClick={() =>
-                    setLightboxState((prev) => ({
-                      ...prev,
-                      imageIndex:
-                        (prev.imageIndex + 1) % activeLightboxImages.length,
-                    }))
-                  }
-                  className="absolute right-2 sm:right-4 z-30 p-3 rounded-full bg-black/70 hover:bg-black text-white border border-white/20 transition cursor-pointer shadow-xl"
-                >
-                  <ChevronRight size={24} />
-                </button>
-              )}
-            </div>
-
-            {activeLightboxImages.length > 1 && (
+            return (
               <div
-                onClick={(e) => e.stopPropagation()}
-                className="w-full flex justify-center shrink-0"
+                key={cert.id}
+                className="w-full max-w-6xl bg-sky-100/60 dark:bg-slate-900/60 border border-sky-200/60 dark:border-slate-800 rounded-3xl p-8 sm:p-10 shadow-2xl transition-colors space-y-6 flex flex-col justify-between min-h-[520px]"
               >
-                <div className="flex items-center gap-2.5 p-2 bg-slate-900/90 border border-slate-800 rounded-2xl shadow-2xl max-w-full overflow-x-auto">
-                  {activeLightboxImages.map((img, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() =>
-                        setLightboxState((prev) => ({
-                          ...prev,
-                          imageIndex: idx,
-                        }))
+                {/* HEADER */}
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="text-indigo-600 dark:text-indigo-400 font-bold text-xs uppercase tracking-wider">
+                      {cert.issuer} • {cert.issueDate}
+                    </div>
+                    <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                      {cert.title}
+                    </h2>
+                  </div>
+
+                  {cert.credentialUrl && (
+                    <a
+                      href={
+                        cert.credentialUrl.startsWith("http")
+                          ? cert.credentialUrl
+                          : `https://${cert.credentialUrl}`
                       }
-                      className={`w-14 h-10 rounded-xl overflow-hidden border-2 transition cursor-pointer shrink-0 ${
-                        lightboxState.imageIndex === idx
-                          ? "border-sky-400 scale-105 shadow-md"
-                          : "border-transparent opacity-40 hover:opacity-100"
-                      }`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-white dark:bg-slate-100 hover:bg-slate-100 dark:hover:bg-white text-slate-900 font-bold text-xs transition shadow-md border border-slate-200 dark:border-slate-100"
                     >
-                      <img
-                        src={img}
-                        alt="Thumb"
-                        className="w-full h-full object-cover"
-                      />
+                      <span>Verify Credential</span>
+                      <ExternalLink size={15} />
+                    </a>
+                  )}
+                </div>
+
+                {/* CERTIFICATE PREVIEW GALLERY */}
+                <div className="space-y-3">
+                  <div
+                    onClick={() =>
+                      setLightboxState({
+                        isOpen: true,
+                        certId: cert.id,
+                        imageIndex: activeImgIdx,
+                      })
+                    }
+                    className="relative w-full h-72 sm:h-80 md:h-96 rounded-2xl overflow-hidden bg-slate-950 border border-slate-200/50 dark:border-slate-800 shadow-inner group cursor-pointer"
+                  >
+                    <img
+                      src={currentImg}
+                      alt={cert.title}
+                      className="w-full h-full object-contain p-2 hover:scale-102 transition duration-500"
+                    />
+                    <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition duration-300 flex items-center justify-center gap-2 text-white font-medium text-xs backdrop-blur-[2px]">
+                      <Maximize2 size={18} />
+                      <span>Click to view full certificate</span>
+                    </div>
+                  </div>
+
+                  {images.length > 1 && (
+                    <div className="flex items-center gap-3 overflow-x-auto pb-1 pt-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Credentials ({images.length}):
+                      </span>
+                      {images.map((img, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() =>
+                            setActiveImageIndexMap((prev) => ({
+                              ...prev,
+                              [cert.id]: idx,
+                            }))
+                          }
+                          className={`relative w-16 h-12 rounded-lg overflow-hidden border-2 transition cursor-pointer shrink-0 ${
+                            activeImgIdx === idx
+                              ? "border-sky-500 scale-105 shadow-md"
+                              : "border-slate-300 dark:border-slate-700 opacity-60 hover:opacity-100"
+                          }`}
+                        >
+                          <img
+                            src={img}
+                            alt="Thumb"
+                            className="w-full h-full object-cover"
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* ABOUT CERTIFICATE */}
+                <div className="space-y-6 pt-2">
+                  <div className="space-y-1">
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                      CREDENTIAL DETAILS
+                    </h3>
+                    <p className="text-sm sm:text-base text-slate-700 dark:text-slate-300 leading-relaxed font-medium">
+                      {cert.description}
+                    </p>
+                  </div>
+
+                  {/* ACTIONS BAR */}
+                  <div className="pt-4 border-t border-slate-300/40 dark:border-slate-800 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <button
+                        onClick={() => handleLikeToggle(cert.id)}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl transition shadow-xs cursor-pointer border text-xs font-bold ${
+                          isLiked
+                            ? "bg-rose-500 text-white border-rose-500"
+                            : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-rose-500 hover:bg-rose-50 dark:hover:bg-slate-700"
+                        }`}
+                      >
+                        <Heart
+                          size={16}
+                          className={isLiked ? "fill-white" : "fill-rose-500"}
+                        />
+                        <span>{certLikes} Likes</span>
+                      </button>
+
+                      <button
+                        onClick={() =>
+                          setActiveCommentCertId(
+                            isCommentBoxOpen ? null : cert.id,
+                          )
+                        }
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-slate-700 text-xs font-bold transition cursor-pointer shadow-xs"
+                      >
+                        <MessageSquare size={16} />
+                        <span>{certComments.length} Comments</span>
+                      </button>
+                    </div>
+
+                    <button
+                      onClick={() => handleShare(cert)}
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-white text-white dark:text-slate-900 text-xs font-bold transition cursor-pointer shadow-md"
+                    >
+                      {copiedShareId === cert.id ? (
+                        <>
+                          <Check
+                            size={15}
+                            className="text-emerald-400 dark:text-emerald-600"
+                          />
+                          <span>Link Copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Share2 size={15} />
+                          <span>Share</span>
+                        </>
+                      )}
                     </button>
-                  ))}
+                  </div>
+
+                  {/* COMMENTS DRAWER */}
+                  {isCommentBoxOpen && (
+                    <div className="pt-4 border-t border-slate-200 dark:border-slate-800 space-y-4 animate-in fade-in duration-200">
+                      <div className="flex justify-between items-center">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                          Endorsements &amp; Comments ({certComments.length})
+                        </h4>
+                        <button
+                          onClick={() => setActiveCommentCertId(null)}
+                          className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+
+                      <form
+                        onSubmit={(e) => handleAddComment(cert.id, e)}
+                        className="space-y-2 bg-white/70 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-200 dark:border-slate-700/60"
+                      >
+                        <input
+                          type="text"
+                          placeholder="Your Name (optional)"
+                          value={authorNameInput}
+                          onChange={(e) => setAuthorNameInput(e.target.value)}
+                          className="w-full p-2 border rounded-xl text-xs bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 focus:outline-indigo-600"
+                        />
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            placeholder="Leave an endorsement or review..."
+                            value={commentInput}
+                            onChange={(e) => setCommentInput(e.target.value)}
+                            className="flex-1 p-2.5 border rounded-xl text-xs bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 focus:outline-indigo-600"
+                          />
+                          <button
+                            type="submit"
+                            className="flex items-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs rounded-xl transition cursor-pointer"
+                          >
+                            <Send size={13} />
+                            <span>Post</span>
+                          </button>
+                        </div>
+                      </form>
+
+                      <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                        {certComments.length > 0 ? (
+                          certComments.map((comment) => (
+                            <div
+                              key={comment.id}
+                              className="p-3 bg-white/80 dark:bg-slate-800/80 rounded-xl border border-slate-200/60 dark:border-slate-700/60 text-xs space-y-1 relative group"
+                            >
+                              <div className="flex justify-between items-center pr-6">
+                                <span className="font-bold text-indigo-600 dark:text-indigo-400">
+                                  {comment.author}
+                                </span>
+                                <span className="text-[10px] text-slate-400">
+                                  {comment.timestamp}
+                                </span>
+                              </div>
+                              <p className="text-slate-700 dark:text-slate-300">
+                                {comment.text}
+                              </p>
+                              {isOwner && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleDeleteComment(cert.id, comment.id)
+                                  }
+                                  className="absolute top-3 right-3 text-slate-400 hover:text-rose-500 transition cursor-pointer"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              )}
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-xs text-slate-400 italic text-center py-2">
+                            No comments yet. Be the first to endorse!
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* LIGHTBOX MODAL */}
+      {lightboxState.isOpen && activeLightboxCert && (
+        <div
+          onClick={() =>
+            setLightboxState({ isOpen: false, certId: null, imageIndex: 0 })
+          }
+          className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-md flex flex-col justify-between p-4 sm:p-6 animate-in fade-in duration-200 select-none overflow-hidden"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full flex justify-between items-center bg-slate-900/90 border border-slate-800 px-5 py-3 rounded-2xl text-white max-w-6xl mx-auto shadow-2xl shrink-0"
+          >
+            <div>
+              <h3 className="text-sm sm:text-base font-bold leading-tight">
+                {activeLightboxCert.title}
+              </h3>
+              <p className="text-[11px] text-slate-400">
+                Accredited by {activeLightboxCert.issuer} (
+                {lightboxState.imageIndex + 1} of {activeLightboxImages.length})
+              </p>
+            </div>
+            <button
+              onClick={() =>
+                setLightboxState({
+                  isOpen: false,
+                  certId: null,
+                  imageIndex: 0,
+                })
+              }
+              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative flex-1 w-full max-w-6xl mx-auto my-3 flex items-center justify-center overflow-hidden"
+          >
+            {activeLightboxImages.length > 1 && (
+              <button
+                onClick={() =>
+                  setLightboxState((prev) => ({
+                    ...prev,
+                    imageIndex:
+                      (prev.imageIndex - 1 + activeLightboxImages.length) %
+                      activeLightboxImages.length,
+                  }))
+                }
+                className="absolute left-2 sm:left-4 z-30 p-3 rounded-full bg-black/70 hover:bg-black text-white border border-white/20 transition cursor-pointer shadow-xl"
+              >
+                <ChevronLeft size={24} />
+              </button>
+            )}
+
+            <img
+              src={activeLightboxImages[lightboxState.imageIndex]}
+              alt={activeLightboxCert.title}
+              className="max-w-full max-h-full object-contain rounded-xl shadow-2xl border border-slate-800"
+            />
+
+            {activeLightboxImages.length > 1 && (
+              <button
+                onClick={() =>
+                  setLightboxState((prev) => ({
+                    ...prev,
+                    imageIndex:
+                      (prev.imageIndex + 1) % activeLightboxImages.length,
+                  }))
+                }
+                className="absolute right-2 sm:right-4 z-30 p-3 rounded-full bg-black/70 hover:bg-black text-white border border-white/20 transition cursor-pointer shadow-xl"
+              >
+                <ChevronRight size={24} />
+              </button>
             )}
           </div>
-        )}
 
-        <CertificateEditorModal
-          isOpen={isEditorOpen}
-          onClose={() => setIsEditorOpen(false)}
-          certificates={certificates}
-          setCertificates={setCertificates}
-        />
-      </main>
-    </>
+          {activeLightboxImages.length > 1 && (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="w-full flex justify-center shrink-0"
+            >
+              <div className="flex items-center gap-2.5 p-2 bg-slate-900/90 border border-slate-800 rounded-2xl shadow-2xl max-w-full overflow-x-auto">
+                {activeLightboxImages.map((img, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() =>
+                      setLightboxState((prev) => ({
+                        ...prev,
+                        imageIndex: idx,
+                      }))
+                    }
+                    className={`w-14 h-10 rounded-xl overflow-hidden border-2 transition cursor-pointer shrink-0 ${
+                      lightboxState.imageIndex === idx
+                        ? "border-sky-400 scale-105 shadow-md"
+                        : "border-transparent opacity-40 hover:opacity-100"
+                    }`}
+                  >
+                    <img
+                      src={img}
+                      alt="Thumb"
+                      className="w-full h-full object-cover"
+                    />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <CertificateEditorModal
+        isOpen={isEditorOpen}
+        onClose={() => setIsEditorOpen(false)}
+        certificates={certificates}
+        setCertificates={setCertificates}
+      />
+    </main>
   );
 }
 
 export default function CertificatesPage() {
   return (
-    <Suspense fallback={<ProjectSkeleton />}>
+    <Suspense fallback={<CertificateSkeleton />}>
       <CertificatesContent />
     </Suspense>
   );

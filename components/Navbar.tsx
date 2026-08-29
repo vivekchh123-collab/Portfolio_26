@@ -202,7 +202,7 @@ function NavbarContent() {
                         size={16}
                         className="text-indigo-600 dark:text-indigo-400"
                       />
-                      <span>Edit Hero / About</span>
+                      <span>Edit About Me</span>
                     </div>
                     {!isSignedIn && (
                       <Lock size={14} className="text-amber-500" />
@@ -258,7 +258,7 @@ function NavbarContent() {
                         size={16}
                         className="text-indigo-600 dark:text-indigo-400"
                       />
-                      <span>Edit Social / Dev Links</span>
+                      <span>Edit Social Links</span>
                     </div>
                     {!isSignedIn && <Lock size={14} />}
                   </button>
@@ -349,16 +349,12 @@ function NavbarContent() {
               )}
             </div>
 
-            {/* CERTIFICATE LINK WITH CUSTOM BADGE */}
+            {/* CERTIFICATE LINK WITHOUT ICON */}
             <Link
               href={`/certificates${queryParam}`}
-              className="flex items-center gap-1.5 hover:text-black dark:hover:text-white transition"
+              className="hover:text-black dark:hover:text-white transition"
             >
-              <CertificateIcon
-                size={16}
-                className="text-indigo-600 dark:text-indigo-400"
-              />
-              <span>Certificates</span>
+              Certificates
             </Link>
 
             <Link
