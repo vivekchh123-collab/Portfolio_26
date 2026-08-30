@@ -41,8 +41,27 @@ cd portfolio-app
 
 ```bash
 npm install
+# or
+yarn install
+# or
+pnpm install
 ```
-### 3. Supabase Database Schema
+
+### 3. Configure Environment Variables
+
+Create a `.env.local` file in the root of your project:
+
+```bash
+# Clerk Authentication
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
+CLERK_SECRET_KEY=sk_test_...
+
+# Supabase Configuration
+NEXT_PUBLIC_SUPABASE_URL=https://your-supabase-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOi...
+```
+
+### 4. Supabase Database Schema
 
 Run the following SQL migration script in your Supabase SQL Editor:
 
