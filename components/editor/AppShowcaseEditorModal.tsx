@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { X, Plus, Trash2, Upload, Layers, RefreshCw } from "lucide-react";
+import { X, Plus, Trash2, Upload, Layers, RefreshCw, Save } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -77,7 +77,6 @@ export default function AppShowcaseEditorModal({
         }
       }
     } else {
-      // Reset load lock when modal closes
       hasLoadedRef.current = false;
     }
 
@@ -107,7 +106,7 @@ export default function AppShowcaseEditorModal({
 
   if (!isOpen) return null;
 
-  // Add project cleanly to local state
+  // Add project to the TOP of the list (Newest First)
   const handleAddProject = () => {
     const newProject: ProjectItem = {
       id: Date.now().toString(),
@@ -117,7 +116,8 @@ export default function AppShowcaseEditorModal({
       techStack: ["Next.js", "TypeScript", "Tailwind CSS"],
       images: [],
     };
-    setLocalProjects((prev) => [...prev, newProject]);
+    // Prepend to top
+    setLocalProjects((prev) => [newProject, ...prev]);
   };
 
   // Remove project cleanly from local state
@@ -282,6 +282,7 @@ export default function AppShowcaseEditorModal({
           <X size={20} />
         </button>
 
+        {/* Modal Header */}
         <h2 className="text-xl font-bold border-b border-slate-200 dark:border-slate-800 pb-3 flex items-center gap-2">
           <Layers size={22} className="text-indigo-600 dark:text-indigo-400" />
           Edit Applications &amp; Showcase Images
@@ -289,16 +290,28 @@ export default function AppShowcaseEditorModal({
 
         {/* PROJECTS LIST */}
         <div className="space-y-6">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-wrap justify-between items-center gap-2 border-b border-slate-200/60 dark:border-slate-800 pb-2">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
               Applications List ({localProjects.length})
             </h3>
-            <button
-              onClick={handleAddProject}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium transition cursor-pointer shadow-md"
-            >
-              <Plus size={14} /> Add New Project
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleAddProject}
+                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium transition cursor-pointer shadow-md"
+              >
+                <Plus size={14} /> Add New Project
+              </button>
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={isSaving}
+                className="flex items-center gap-1.5 text-xs px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium transition cursor-pointer shadow-md disabled:opacity-50"
+              >
+                <Save size={14} />
+                {isSaving ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
           </div>
 
           {localProjects.map((project) => (
@@ -459,8 +472,9 @@ export default function AppShowcaseEditorModal({
         <button
           onClick={handleSave}
           disabled={isSaving}
-          className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl text-sm transition mt-2 cursor-pointer shadow-lg disabled:opacity-50"
+          className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl text-sm transition mt-2 cursor-pointer shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
         >
+          <Save size={16} />
           {isSaving ? "Saving to Database..." : "Save Application Showcase"}
         </button>
       </div>

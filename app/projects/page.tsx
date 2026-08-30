@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, Suspense } from "react";
+import { useState, useEffect, useCallback, Suspense, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   ExternalLink,
@@ -43,8 +43,13 @@ function ProjectsContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
 
+  // Total Likes stored in database
   const [likesMap, setLikesMap] = useState<Record<string, number>>({});
-  const [userLikesMap, setUserLikesMap] = useState<Record<string, boolean>>({});
+  // Session-only like tracker (resets to unliked when the page is reloaded)
+  const [sessionLikedMap, setSessionLikedMap] = useState<
+    Record<string, boolean>
+  >({});
+
   const [commentsMap, setCommentsMap] = useState<Record<string, Comment[]>>({});
   const [activeImageIndexMap, setActiveImageIndexMap] = useState<
     Record<string, number>
@@ -83,6 +88,10 @@ function ProjectsContent() {
 
   const [projects, setProjects] = useState<ProjectItem[]>(defaultProjects);
 
+  const sortedProjects = useMemo(() => {
+    return [...projects].reverse();
+  }, [projects]);
+
   const loadProjectsData = useCallback(async () => {
     if (!targetUserId) {
       setIsLoading(false);
@@ -92,9 +101,7 @@ function ProjectsContent() {
     try {
       const { data, error } = await supabase
         .from("profiles")
-        .select(
-          "projects, project_likes_map, project_user_likes_map, project_comments_map",
-        )
+        .select("projects, project_likes_map, project_comments_map")
         .eq("user_id", targetUserId)
         .single();
 
@@ -107,8 +114,6 @@ function ProjectsContent() {
           setProjects(data.projects);
         }
         if (data.project_likes_map) setLikesMap(data.project_likes_map);
-        if (data.project_user_likes_map)
-          setUserLikesMap(data.project_user_likes_map);
         if (data.project_comments_map)
           setCommentsMap(data.project_comments_map);
       }
@@ -134,7 +139,6 @@ function ProjectsContent() {
 
   const syncEngagementsToSupabase = async (
     updatedLikes: Record<string, number>,
-    updatedUserLikes: Record<string, boolean>,
     updatedComments: Record<string, Comment[]>,
   ) => {
     if (!targetUserId) return;
@@ -144,7 +148,6 @@ function ProjectsContent() {
         .from("profiles")
         .update({
           project_likes_map: updatedLikes,
-          project_user_likes_map: updatedUserLikes,
           project_comments_map: updatedComments,
           updated_at: new Date().toISOString(),
         })
@@ -154,26 +157,25 @@ function ProjectsContent() {
     }
   };
 
+  // 1 like per visit toggle (reloads allow liking again)
   const handleLikeToggle = (projectId: string) => {
-    const hasLiked = !!userLikesMap[projectId];
+    const isCurrentlyLiked = !!sessionLikedMap[projectId];
     const currentLikes = likesMap[projectId] || 0;
 
-    const nextLikes = hasLiked
+    const nextLikes = isCurrentlyLiked
       ? Math.max(0, currentLikes - 1)
       : currentLikes + 1;
-    const nextUserLikes = !hasLiked;
 
     const updatedLikesMap = { ...likesMap, [projectId]: nextLikes };
-    const updatedUserLikesMap = { ...userLikesMap, [projectId]: nextUserLikes };
+    const updatedSessionMap = {
+      ...sessionLikedMap,
+      [projectId]: !isCurrentlyLiked,
+    };
 
     setLikesMap(updatedLikesMap);
-    setUserLikesMap(updatedUserLikesMap);
+    setSessionLikedMap(updatedSessionMap);
 
-    syncEngagementsToSupabase(
-      updatedLikesMap,
-      updatedUserLikesMap,
-      commentsMap,
-    );
+    syncEngagementsToSupabase(updatedLikesMap, commentsMap);
   };
 
   const handleAddComment = (projectId: string, e: React.FormEvent) => {
@@ -192,7 +194,7 @@ function ProjectsContent() {
     const updatedCommentsMap = { ...commentsMap, [projectId]: updatedComments };
 
     setCommentsMap(updatedCommentsMap);
-    syncEngagementsToSupabase(likesMap, userLikesMap, updatedCommentsMap);
+    syncEngagementsToSupabase(likesMap, updatedCommentsMap);
     setCommentInput("");
   };
 
@@ -207,7 +209,7 @@ function ProjectsContent() {
     };
 
     setCommentsMap(updatedCommentsMap);
-    syncEngagementsToSupabase(likesMap, userLikesMap, updatedCommentsMap);
+    syncEngagementsToSupabase(likesMap, updatedCommentsMap);
   };
 
   const handleSelectImage = (projectId: string, index: number) => {
@@ -234,7 +236,7 @@ function ProjectsContent() {
       try {
         await navigator.share(shareData);
       } catch (err) {
-        console.log("Share cancelled", err);
+        console.log("Share cancelled or failed", err);
       }
     } else {
       navigator.clipboard.writeText(shareUrl);
@@ -255,11 +257,25 @@ function ProjectsContent() {
   return (
     <>
       <main className="min-h-[calc(100vh-5rem)] pt-24 pb-12 flex flex-col items-center justify-center text-slate-900 dark:text-slate-100 transition-colors">
-        <div className="w-full max-w-6xl mx-auto space-y-12 flex flex-col items-center">
+        <div className="w-full max-w-6xl mx-auto space-y-10 flex flex-col items-center px-4 sm:px-0">
+          <div className="w-full flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">
+                Featured Projects
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+                Newest to oldest showcase
+              </p>
+            </div>
+            <span className="text-xs font-semibold px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+              {sortedProjects.length} Projects
+            </span>
+          </div>
+
           <div className="w-full space-y-12 flex flex-col items-center">
-            {projects.map((project) => {
+            {sortedProjects.map((project) => {
               const projectLikes = likesMap[project.id] || 0;
-              const isLiked = !!userLikesMap[project.id];
+              const isLiked = !!sessionLikedMap[project.id];
               const projectComments = commentsMap[project.id] || [];
               const isCommentBoxOpen = activeCommentProjectId === project.id;
 
@@ -270,7 +286,6 @@ function ProjectsContent() {
                       "https://images.unsplash.com/photo-1551288049-bebda4e38f71?q=80&w=1000&auto=format&fit=crop",
                     ];
 
-              // Prevent index out of bounds when images are deleted
               const savedIdx = activeImageIndexMap[project.id] || 0;
               const activeImgIdx = savedIdx >= images.length ? 0 : savedIdx;
               const currentImg = images[activeImgIdx] || images[0];
@@ -280,11 +295,10 @@ function ProjectsContent() {
                   key={project.id}
                   className="w-full max-w-6xl bg-sky-100/60 dark:bg-slate-900/60 border border-sky-200/60 dark:border-slate-800 rounded-3xl p-8 sm:p-10 shadow-2xl transition-colors space-y-6 flex flex-col justify-between min-h-[520px]"
                 >
-                  {/* TOP HEADER ROW */}
                   <div className="flex flex-wrap items-center justify-between gap-4">
-                    <h1 className="text-4xl sm:text-5xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                    <h2 className="text-4xl sm:text-5xl font-extrabold text-slate-900 dark:text-white tracking-tight">
                       {project.name}
-                    </h1>
+                    </h2>
 
                     <div>
                       {project.appUrl && (
@@ -305,7 +319,6 @@ function ProjectsContent() {
                     </div>
                   </div>
 
-                  {/* PREVIEW GALLERY */}
                   <div className="space-y-3">
                     <div
                       onClick={() =>
@@ -355,7 +368,6 @@ function ProjectsContent() {
                     )}
                   </div>
 
-                  {/* DETAILS */}
                   <div className="space-y-6 pt-2">
                     <div className="space-y-1">
                       <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
@@ -384,7 +396,7 @@ function ProjectsContent() {
                       </div>
                     )}
 
-                    {/* ACTIONS */}
+                    {/* ACTIONS BAR (1 LIKE PER VISIT) */}
                     <div className="pt-4 border-t border-slate-300/40 dark:border-slate-800 flex items-center justify-between gap-4">
                       <div className="flex items-center gap-4">
                         <button
@@ -436,7 +448,6 @@ function ProjectsContent() {
                       </button>
                     </div>
 
-                    {/* COMMENTS DRAWER */}
                     {isCommentBoxOpen && (
                       <div className="pt-4 border-t border-slate-200 dark:border-slate-800 space-y-4 animate-in fade-in duration-200">
                         <div className="flex justify-between items-center">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Plus, Trash2, Upload, RefreshCw } from "lucide-react";
+import { X, Plus, Trash2, Upload, Save } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { supabase } from "@/lib/supabaseClient";
 import CertificateIcon from "@/components/icons/CertificateIcon";
@@ -85,6 +85,7 @@ export default function CertificateEditorModal({
 
   if (!isOpen) return null;
 
+  // Add certificate to the TOP of the list (Newest First)
   const handleAddCert = () => {
     const newCert: CertificateItem = {
       id: Date.now().toString(),
@@ -96,7 +97,8 @@ export default function CertificateEditorModal({
       credentialUrl: "",
       images: [],
     };
-    setLocalCerts((prev) => [...prev, newCert]);
+    // Prepend to top
+    setLocalCerts((prev) => [newCert, ...prev]);
   };
 
   const handleCertChange = (
@@ -201,20 +203,32 @@ export default function CertificateEditorModal({
           <X size={20} />
         </button>
 
-        <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-3 pr-8">
+        <div className="flex flex-wrap justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-3 pr-8 gap-3">
           <h2 className="text-xl font-bold flex items-center gap-2">
             <CertificateIcon
               size={22}
               className="text-indigo-600 dark:text-indigo-400"
             />
-            Edit Certificates & Badges
+            Edit Certificates &amp; Badges
           </h2>
-          <button
-            onClick={handleAddCert}
-            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium transition cursor-pointer"
-          >
-            <Plus size={14} /> Add Certificate
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleAddCert}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium transition cursor-pointer shadow-md"
+            >
+              <Plus size={14} /> Add Certificate
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={isSaving}
+              className="flex items-center gap-1.5 text-xs px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium transition cursor-pointer shadow-md disabled:opacity-50"
+            >
+              <Save size={14} />
+              {isSaving ? "Saving..." : "Save Changes"}
+            </button>
+          </div>
         </div>
 
         <div className="space-y-6">
@@ -359,8 +373,9 @@ export default function CertificateEditorModal({
         <button
           onClick={handleSave}
           disabled={isSaving}
-          className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl text-sm transition mt-2 cursor-pointer shadow-lg disabled:opacity-50"
+          className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl text-sm transition mt-2 cursor-pointer shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
         >
+          <Save size={16} />
           {isSaving ? "Saving..." : "Save Certificates Showcase"}
         </button>
       </div>
