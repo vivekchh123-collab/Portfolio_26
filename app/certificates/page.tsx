@@ -42,7 +42,9 @@ function CertificatesContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
 
+  // Total Likes stored in database
   const [likesMap, setLikesMap] = useState<Record<string, number>>({});
+  // Session-only like tracker (resets on page reload)
   const [sessionLikedMap, setSessionLikedMap] = useState<
     Record<string, boolean>
   >({});
@@ -83,8 +85,9 @@ function CertificatesContent() {
   const [certificates, setCertificates] =
     useState<CertificateItem[]>(defaultCertificates);
 
+  // Strictly preserve Newest-First ordering as saved in the editor
   const sortedCertificates = useMemo(() => {
-    return [...certificates].reverse();
+    return [...certificates];
   }, [certificates]);
 
   const loadCertsData = useCallback(async () => {
@@ -562,7 +565,11 @@ function CertificatesContent() {
             </div>
             <button
               onClick={() =>
-                setLightboxState({ isOpen: false, certId: null, imageIndex: 0 })
+                setLightboxState({
+                  isOpen: false,
+                  certId: null,
+                  imageIndex: 0,
+                })
               }
               className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
             >
@@ -622,7 +629,10 @@ function CertificatesContent() {
                   <button
                     key={idx}
                     onClick={() =>
-                      setLightboxState((prev) => ({ ...prev, imageIndex: idx }))
+                      setLightboxState((prev) => ({
+                        ...prev,
+                        imageIndex: idx,
+                      }))
                     }
                     className={`w-14 h-10 rounded-xl overflow-hidden border-2 transition cursor-pointer shrink-0 ${
                       lightboxState.imageIndex === idx

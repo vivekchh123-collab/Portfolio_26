@@ -45,7 +45,7 @@ function ProjectsContent() {
 
   // Total Likes stored in database
   const [likesMap, setLikesMap] = useState<Record<string, number>>({});
-  // Session-only like tracker (resets to unliked when the page is reloaded)
+  // Session-only like tracker (resets on page reload)
   const [sessionLikedMap, setSessionLikedMap] = useState<
     Record<string, boolean>
   >({});
@@ -88,8 +88,9 @@ function ProjectsContent() {
 
   const [projects, setProjects] = useState<ProjectItem[]>(defaultProjects);
 
+  // Strictly preserve Newest-First ordering as saved in the editor
   const sortedProjects = useMemo(() => {
-    return [...projects].reverse();
+    return [...projects];
   }, [projects]);
 
   const loadProjectsData = useCallback(async () => {
@@ -157,7 +158,6 @@ function ProjectsContent() {
     }
   };
 
-  // 1 like per visit toggle (reloads allow liking again)
   const handleLikeToggle = (projectId: string) => {
     const isCurrentlyLiked = !!sessionLikedMap[projectId];
     const currentLikes = likesMap[projectId] || 0;
@@ -396,7 +396,7 @@ function ProjectsContent() {
                       </div>
                     )}
 
-                    {/* ACTIONS BAR (1 LIKE PER VISIT) */}
+                    {/* Actions Bar */}
                     <div className="pt-4 border-t border-slate-300/40 dark:border-slate-800 flex items-center justify-between gap-4">
                       <div className="flex items-center gap-4">
                         <button

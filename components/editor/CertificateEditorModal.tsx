@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { X, Plus, Trash2, Upload, Save } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { X, Plus, Trash2, Upload, Save, RefreshCw } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { supabase } from "@/lib/supabaseClient";
 import CertificateIcon from "@/components/icons/CertificateIcon";
@@ -31,42 +31,66 @@ export default function CertificateEditorModal({
 }: CertificateEditorModalProps) {
   const { user } = useUser();
   const [isSaving, setIsSaving] = useState(false);
-  const [localCerts, setLocalCerts] =
-    useState<CertificateItem[]>(externalCerts);
+  const [localCerts, setLocalCerts] = useState<CertificateItem[]>([]);
+
+  // Ref lock to ensure data hydrates ONCE per modal opening
+  const hasLoadedRef = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
-    if (isOpen && user?.id) {
-      async function fetchCerts() {
-        try {
-          const { data, error } = await supabase
-            .from("profiles")
-            .select("certificates")
-            .eq("user_id", user?.id)
-            .single();
 
-          if (
-            isMounted &&
-            data?.certificates &&
-            Array.isArray(data.certificates) &&
-            !error
-          ) {
-            setLocalCerts(data.certificates);
-            if (externalSetCerts) externalSetCerts(data.certificates);
-          } else if (isMounted && externalCerts.length > 0) {
-            setLocalCerts(externalCerts);
+    if (isOpen) {
+      if (!hasLoadedRef.current) {
+        // Hydrate from external state first if available
+        if (externalCerts && externalCerts.length > 0) {
+          setLocalCerts(JSON.parse(JSON.stringify(externalCerts)));
+        }
+
+        // Fetch from Supabase once on modal open
+        if (user?.id) {
+          async function fetchUserCertificates() {
+            try {
+              const { data, error } = await supabase
+                .from("profiles")
+                .select("certificates")
+                .eq("user_id", user?.id)
+                .single();
+
+              if (
+                isMounted &&
+                data?.certificates &&
+                Array.isArray(data.certificates) &&
+                !error
+              ) {
+                setLocalCerts(data.certificates);
+              }
+            } catch (err) {
+              console.error(
+                "Failed to fetch certificates in editor modal:",
+                err,
+              );
+            } finally {
+              if (isMounted) {
+                hasLoadedRef.current = true;
+              }
+            }
           }
-        } catch (err) {
-          console.error("Failed to load certificates:", err);
+          fetchUserCertificates();
+        } else {
+          hasLoadedRef.current = true;
         }
       }
-      fetchCerts();
+    } else {
+      // Reset load lock when modal closes
+      hasLoadedRef.current = false;
     }
+
     return () => {
       isMounted = false;
     };
-  }, [isOpen, user]);
+  }, [isOpen, user?.id]); // Removed externalCerts from dependencies to avoid infinite re-render resets
 
+  // Escape key & background scroll lock
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -97,7 +121,6 @@ export default function CertificateEditorModal({
       credentialUrl: "",
       images: [],
     };
-    // Prepend to top
     setLocalCerts((prev) => [newCert, ...prev]);
   };
 
@@ -111,43 +134,65 @@ export default function CertificateEditorModal({
     );
   };
 
-  const handleImageUpload = (
-    id: string,
-    e: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const files = e.target.files;
-    if (!files) return;
-
-    const fileList = Array.from(files);
-    const loadedImages: string[] = [];
-
-    fileList.forEach((file) => {
-      if (file.size > 2 * 1024 * 1024) {
-        alert(`File "${file.name}" exceeds 2MB.`);
-        return;
-      }
+  // Helper to read files safely into base64 strings
+  const readFileAsDataUrl = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onloadend = () => {
         if (typeof reader.result === "string") {
-          loadedImages.push(reader.result);
-          if (loadedImages.length === fileList.length) {
-            const cert = localCerts.find((c) => c.id === id);
-            if (cert) {
-              handleCertChange(id, "images", [...cert.images, ...loadedImages]);
-            }
-          }
+          resolve(reader.result);
+        } else {
+          reject(new Error("Failed to convert image to Data URL"));
         }
       };
+      reader.onerror = reject;
       reader.readAsDataURL(file);
     });
   };
 
-  const handleRemoveImage = (certId: string, imgIdx: number) => {
-    const cert = localCerts.find((c) => c.id === certId);
-    if (cert) {
-      const updated = cert.images.filter((_, idx) => idx !== imgIdx);
-      handleCertChange(certId, "images", updated);
+  const handleImageUpload = async (
+    id: string,
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const fileList = Array.from(files);
+    const validFiles: File[] = [];
+
+    fileList.forEach((file) => {
+      if (file.size > 2 * 1024 * 1024) {
+        alert(`File "${file.name}" exceeds 2MB limit.`);
+      } else {
+        validFiles.push(file);
+      }
+    });
+
+    try {
+      const uploadedDataUrls = await Promise.all(
+        validFiles.map((file) => readFileAsDataUrl(file)),
+      );
+
+      setLocalCerts((prev) =>
+        prev.map((c) =>
+          c.id === id
+            ? { ...c, images: [...(c.images || []), ...uploadedDataUrls] }
+            : c,
+        ),
+      );
+    } catch (err) {
+      console.error("Error reading uploaded certificate images:", err);
     }
+  };
+
+  const handleRemoveImage = (certId: string, imgIdx: number) => {
+    setLocalCerts((prev) =>
+      prev.map((c) => {
+        if (c.id !== certId) return c;
+        const updated = (c.images || []).filter((_, idx) => idx !== imgIdx);
+        return { ...c, images: updated };
+      }),
+    );
   };
 
   const handleRemoveCert = (id: string) => {
@@ -203,6 +248,7 @@ export default function CertificateEditorModal({
           <X size={20} />
         </button>
 
+        {/* Top Header with Quick Action Buttons */}
         <div className="flex flex-wrap justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-3 pr-8 gap-3">
           <h2 className="text-xl font-bold flex items-center gap-2">
             <CertificateIcon
@@ -241,6 +287,7 @@ export default function CertificateEditorModal({
                 type="button"
                 onClick={() => handleRemoveCert(cert.id)}
                 className="absolute top-4 right-4 text-slate-400 hover:text-rose-500 transition cursor-pointer"
+                title="Remove Certificate"
               >
                 <Trash2 size={16} />
               </button>
@@ -319,7 +366,7 @@ export default function CertificateEditorModal({
               {/* Certificate Image Uploads */}
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-slate-400 uppercase">
-                  Certificate Images ({cert.images.length})
+                  Certificate Images ({cert.images?.length || 0})
                 </label>
                 <div className="flex flex-wrap gap-3 items-center">
                   <label className="flex flex-col items-center justify-center w-28 h-20 border-2 border-dashed rounded-xl text-xs bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 border-indigo-300 dark:border-indigo-700 cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition">
@@ -336,7 +383,7 @@ export default function CertificateEditorModal({
                     />
                   </label>
 
-                  {cert.images.map((img, idx) => (
+                  {cert.images?.map((img, idx) => (
                     <div
                       key={idx}
                       className="relative w-28 h-20 rounded-xl overflow-hidden border border-slate-300 dark:border-slate-700 group shadow-sm"
