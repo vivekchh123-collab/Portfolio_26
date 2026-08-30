@@ -41,7 +41,7 @@ cd portfolio-app
 
 ```bash
 npm install
-
+```
 ### 3. Supabase Database Schema
 
 Run the following SQL migration script in your Supabase SQL Editor:
@@ -81,7 +81,7 @@ CREATE POLICY "Allow public insert access" ON public.profiles FOR INSERT WITH CH
 CREATE POLICY "Allow public update access" ON public.profiles FOR UPDATE USING (true) WITH CHECK (true);
 ```
 
-### 4. Run Development Server
+### 5. Run Development Server
 
 ```bash
 npm run dev
