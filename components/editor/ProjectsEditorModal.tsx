@@ -1,7 +1,16 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { X, Plus, Trash2, Upload, Globe } from "lucide-react";
+import {
+  X,
+  Plus,
+  Trash2,
+  Upload,
+  Globe,
+  Copy,
+  Check,
+  Save,
+} from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -28,6 +37,7 @@ export default function ProjectsEditorModal({
   const { user } = useUser();
   const [isSaving, setIsSaving] = useState(false);
   const [links, setLinks] = useState<CustomLinkItem[]>([]);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Ref to prevent background re-fetching from overwriting active edits
   const hasLoadedRef = useRef(false);
@@ -81,7 +91,7 @@ export default function ProjectsEditorModal({
     return () => {
       isMounted = false;
     };
-  }, [isOpen, user?.id, externalLinks]);
+  }, [isOpen, user?.id]);
 
   // Modal Escape key and body scroll freeze
   useEffect(() => {
@@ -111,7 +121,8 @@ export default function ProjectsEditorModal({
       url: "https://",
       icon: "",
     };
-    setLinks((prev) => [...prev, newLink]);
+    // Prepend to top
+    setLinks((prev) => [newLink, ...prev]);
   };
 
   const handleLinkChange = (
@@ -143,6 +154,13 @@ export default function ProjectsEditorModal({
       }
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleCopyLink = (id: string, url: string) => {
+    if (!url) return;
+    navigator.clipboard.writeText(url);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
   };
 
   const handleRemoveLink = (id: string) => {
@@ -199,26 +217,37 @@ export default function ProjectsEditorModal({
           <X size={20} />
         </button>
 
-        <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-3 pr-8">
+        <div className="flex flex-wrap justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-3 pr-8 gap-3">
           <div>
             <h2 className="text-xl font-bold flex items-center gap-2">
               <Globe
                 size={22}
                 className="text-indigo-600 dark:text-indigo-400"
               />
-              Developer & Social Links
+              Developer &amp; Social Links
             </h2>
             <p className="text-xs text-slate-400">
               Add LinkedIn, GitHub, LeetCode, Instagram, etc.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={handleAddLink}
-            className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium transition cursor-pointer"
-          >
-            <Plus size={14} /> Add Link
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleAddLink}
+              className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium transition cursor-pointer shadow-md"
+            >
+              <Plus size={14} /> Add Link
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={isSaving}
+              className="flex items-center gap-1.5 text-xs px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium transition cursor-pointer shadow-md disabled:opacity-50"
+            >
+              <Save size={14} />
+              {isSaving ? "Saving..." : "Save"}
+            </button>
+          </div>
         </div>
 
         <div className="space-y-4">
@@ -227,16 +256,31 @@ export default function ProjectsEditorModal({
               key={link.id}
               className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 space-y-3 relative"
             >
-              <button
-                type="button"
-                onClick={() => handleRemoveLink(link.id)}
-                className="absolute top-3 right-3 text-slate-400 hover:text-rose-500 transition cursor-pointer"
-                title="Remove Link"
-              >
-                <Trash2 size={15} />
-              </button>
+              {/* Actions Column: Trash on Top, Copy Below */}
+              <div className="absolute top-3 right-3 flex flex-col items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleRemoveLink(link.id)}
+                  className="text-slate-400 hover:text-rose-500 transition cursor-pointer p-0.5"
+                  title="Remove Link"
+                >
+                  <Trash2 size={15} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleCopyLink(link.id, link.url)}
+                  className="text-slate-400 hover:text-indigo-400 transition cursor-pointer p-0.5"
+                  title="Copy URL"
+                >
+                  {copiedId === link.id ? (
+                    <Check size={15} className="text-emerald-500" />
+                  ) : (
+                    <Copy size={15} />
+                  )}
+                </button>
+              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center pr-8">
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center pr-9">
                 {/* Small Icon Picker */}
                 <div className="sm:col-span-3 flex items-center gap-2">
                   <div className="w-10 h-10 rounded-lg overflow-hidden bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 flex items-center justify-center shrink-0">
@@ -302,8 +346,9 @@ export default function ProjectsEditorModal({
           type="button"
           onClick={handleSave}
           disabled={isSaving}
-          className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl text-sm transition mt-2 cursor-pointer shadow-lg disabled:opacity-50"
+          className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl text-sm transition mt-2 cursor-pointer shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
         >
+          <Save size={16} />
           {isSaving ? "Saving Links..." : "Save & Apply Links"}
         </button>
       </div>

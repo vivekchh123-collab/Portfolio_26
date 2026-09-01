@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { X, Upload, Key, Plus, Trash2, Share2 } from "lucide-react";
+import { X, Upload, Key, Plus, Trash2, Share2, Save } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -49,63 +49,68 @@ export default function ResumeEditorModal({
   const [isSaving, setIsSaving] = useState(false);
 
   // Maintain isolated internal modal state
-  const [formData, setFormData] = useState<ResumeData>(
-    externalResumeData || {},
-  );
+  const [formData, setFormData] = useState<ResumeData>({});
 
-  // Ref to ensure we ONLY load from DB once per modal opening
+  // Ref to guarantee we ONLY load from DB/props ONCE per modal opening
   const hasLoadedRef = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
 
     if (isOpen) {
-      if (externalResumeData && Object.keys(externalResumeData).length > 0) {
-        setFormData(externalResumeData);
-      }
-
-      if (user?.id && !hasLoadedRef.current) {
-        async function fetchResumeData() {
-          try {
-            const { data, error } = await supabase
-              .from("profiles")
-              .select("resume_data")
-              .eq("user_id", user?.id)
-              .single();
-
-            if (
-              isMounted &&
-              data?.resume_data &&
-              typeof data.resume_data === "object" &&
-              Object.keys(data.resume_data).length > 0 &&
-              !error
-            ) {
-              setFormData(data.resume_data as ResumeData);
-            } else if (isMounted && user?.primaryEmailAddress?.emailAddress) {
-              setFormData((prev) => ({
-                ...prev,
-                email: user?.primaryEmailAddress?.emailAddress || prev.email,
-              }));
-            }
-          } catch (err) {
-            console.error("Failed to fetch resume data from Supabase", err);
-          } finally {
-            if (isMounted) {
-              hasLoadedRef.current = true;
-            }
-          }
+      if (!hasLoadedRef.current) {
+        // Hydrate from external state first if available
+        if (externalResumeData && Object.keys(externalResumeData).length > 0) {
+          setFormData(JSON.parse(JSON.stringify(externalResumeData)));
         }
 
-        fetchResumeData();
+        // Fetch from Supabase once on modal open
+        if (user?.id) {
+          async function fetchResumeData() {
+            try {
+              const { data, error } = await supabase
+                .from("profiles")
+                .select("resume_data")
+                .eq("user_id", user?.id)
+                .single();
+
+              if (
+                isMounted &&
+                data?.resume_data &&
+                typeof data.resume_data === "object" &&
+                Object.keys(data.resume_data).length > 0 &&
+                !error
+              ) {
+                setFormData(data.resume_data as ResumeData);
+              } else if (isMounted && user?.primaryEmailAddress?.emailAddress) {
+                setFormData((prev) => ({
+                  ...prev,
+                  email: user?.primaryEmailAddress?.emailAddress || prev.email,
+                }));
+              }
+            } catch (err) {
+              console.error("Failed to fetch resume data from Supabase", err);
+            } finally {
+              if (isMounted) {
+                hasLoadedRef.current = true;
+              }
+            }
+          }
+
+          fetchResumeData();
+        } else {
+          hasLoadedRef.current = true;
+        }
       }
     } else {
+      // Reset load lock when modal closes
       hasLoadedRef.current = false;
     }
 
     return () => {
       isMounted = false;
     };
-  }, [isOpen, user, externalResumeData]);
+  }, [isOpen, user?.id]); // Kept strictly to isOpen and user?.id to prevent unwanted state wipes
 
   // Modal Escape key and scroll lock
   useEffect(() => {
@@ -226,13 +231,13 @@ export default function ResumeEditorModal({
     setFormData((prev) => ({
       ...prev,
       workExperience: [
-        ...(prev?.workExperience || []),
         {
           title: "JOB TITLE",
           company: "Company Name",
           period: "2024 - Present",
           desc: "Description here...",
         },
+        ...(prev?.workExperience || []),
       ],
     }));
   };
@@ -261,12 +266,12 @@ export default function ResumeEditorModal({
     setFormData((prev) => ({
       ...prev,
       education: [
-        ...(prev?.education || []),
         {
           degree: "DEGREE / DIPLOMA",
           school: "University / Institute",
           period: "2020 - 2024",
         },
+        ...(prev?.education || []),
       ],
     }));
   };
@@ -349,9 +354,19 @@ export default function ResumeEditorModal({
           <X size={20} />
         </button>
 
-        <h2 className="text-xl font-bold border-b border-slate-200 dark:border-slate-800 pb-2 pr-8">
-          Edit Resume Content
-        </h2>
+        {/* Header with Quick Save */}
+        <div className="flex flex-wrap justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-3 pr-8 gap-3">
+          <h2 className="text-xl font-bold">Edit Resume Content</h2>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={isSaving}
+            className="flex items-center gap-1.5 text-xs px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium transition cursor-pointer shadow-md disabled:opacity-50"
+          >
+            <Save size={14} />
+            {isSaving ? "Saving..." : "Save Changes"}
+          </button>
+        </div>
 
         <form onSubmit={handleSave} className="space-y-6">
           {/* Security / Password Setting Section */}
@@ -752,12 +767,13 @@ export default function ResumeEditorModal({
             ))}
           </div>
 
-          {/* Save Button */}
+          {/* Bottom Save Button */}
           <button
             type="submit"
             disabled={isSaving}
-            className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg text-sm transition mt-4 cursor-pointer disabled:opacity-50"
+            className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg text-sm transition mt-4 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
           >
+            <Save size={16} />
             {isSaving ? "Saving to Database..." : "Save Resume Changes"}
           </button>
         </form>
