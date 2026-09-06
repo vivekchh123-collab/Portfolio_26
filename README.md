@@ -33,7 +33,7 @@ A modern, full-stack personal portfolio and developer showcase platform built wi
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-username/portfolio-app.git
+git clone https://github.com/vivekchh123-collab/portfolio-app.git
 cd portfolio-app
 ```
 
