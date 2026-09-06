@@ -30,6 +30,16 @@ const signatureFont = Great_Vibes({
   display: "swap",
 });
 
+// Helper to ensure all web links have absolute protocol for valid PDF clickable annotations
+const formatExternalUrl = (url?: string): string => {
+  if (!url) return "#";
+  const trimmed = url.trim();
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+    return trimmed;
+  }
+  return `https://${trimmed}`;
+};
+
 function ResumeContent() {
   const { user } = useUser();
   const searchParams = useSearchParams();
@@ -211,6 +221,35 @@ function ResumeContent() {
 
   return (
     <>
+      {/* Print CSS optimization to guarantee clickable links and proper coloring in downloaded PDF */}
+      <style jsx global>{`
+        @media print {
+          @page {
+            margin: 0;
+            size: auto;
+          }
+          body {
+            background: white !important;
+            color: #1e293b !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          .printable-resume {
+            box-shadow: none !important;
+            border: none !important;
+            border-radius: 0 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+          }
+          a {
+            text-decoration: none !important;
+            color: inherit !important;
+            pointer-events: auto !important;
+            cursor: pointer !important;
+          }
+        }
+      `}</style>
+
       {isLoading && <ResumeSkeleton />}
 
       <main className="min-h-screen pt-24 pb-10 px-4 flex flex-col items-center justify-center relative z-10">
@@ -408,20 +447,26 @@ function ResumeContent() {
 
               <div className="space-y-3">
                 <h3 className="bg-white py-1 px-4 text-center font-bold tracking-widest text-sm text-slate-800 uppercase shadow-sm">
-                  CONTACT & SOCIALS
+                  CONTACT &amp; SOCIALS
                 </h3>
                 <div className="space-y-2.5 text-xs text-slate-700 px-1">
                   {resumeData?.phone && (
-                    <p className="flex items-center gap-3">
+                    <a
+                      href={`tel:${resumeData.phone.replace(/\s+/g, "")}`}
+                      className="flex items-center gap-3 hover:text-[#a87068] transition print:text-slate-800"
+                    >
                       <Phone size={14} className="text-[#a87068] shrink-0" />
                       <span>{resumeData.phone}</span>
-                    </p>
+                    </a>
                   )}
                   {resumeData?.email && (
-                    <p className="flex items-center gap-3">
+                    <a
+                      href={`mailto:${resumeData.email.trim()}`}
+                      className="flex items-center gap-3 hover:text-[#a87068] transition print:text-slate-800"
+                    >
                       <Mail size={14} className="text-[#a87068] shrink-0" />
                       <span>{resumeData.email}</span>
-                    </p>
+                    </a>
                   )}
                   {resumeData?.address && (
                     <p className="flex items-center gap-3">
@@ -433,22 +478,23 @@ function ResumeContent() {
                   {resumeData?.socials && resumeData.socials.length > 0 && (
                     <div className="pt-2 border-t border-[#e2cac7] space-y-2">
                       {resumeData.socials.map((social) => {
-                        const href = social.url?.startsWith("http")
-                          ? social.url
-                          : `https://${social.url}`;
+                        const href = formatExternalUrl(social.url);
                         return (
                           <a
                             key={social.id}
                             href={href}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex items-center justify-between hover:text-[#a87068] transition font-medium"
+                            className="flex items-center justify-between hover:text-[#a87068] transition font-medium text-slate-700 print:text-slate-800 print:underline"
                           >
                             <span className="flex items-center gap-2">
                               <Globe size={13} className="text-[#a87068]" />
                               {social.platform || "Social Link"}
                             </span>
-                            <ExternalLink size={11} className="opacity-60" />
+                            <ExternalLink
+                              size={11}
+                              className="opacity-60 print:hidden"
+                            />
                           </a>
                         );
                       })}
