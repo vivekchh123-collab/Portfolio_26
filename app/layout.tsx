@@ -66,7 +66,6 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
   const [profileImg, setProfileImg] = useState(DEFAULT_AVATAR);
   const [signature, setSignature] = useState("Signature");
 
-  // Stable profile loader with isolated dependency
   const loadProfileFromSupabase = useCallback(async () => {
     if (!isSignedIn || !userId) return;
 
@@ -137,6 +136,10 @@ export default function RootLayout({
   return (
     <ClerkProvider>
       <html lang="en" className={`${caveat.variable} dark`}>
+        <head>
+          {/* Custom Logo / Favicon declaration */}
+          <link rel="icon" href="/icon.png" type="image/png" />
+        </head>
         <body className="bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 min-h-screen antialiased transition-colors flex flex-col justify-between">
           <LayoutContent>{children}</LayoutContent>
         </body>
