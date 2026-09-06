@@ -7,10 +7,9 @@ import {
   Mail,
   Globe,
   MapPin,
-  Printer,
+  Download,
   Lock,
   Unlock,
-  ExternalLink,
   Send,
   Check,
 } from "lucide-react";
@@ -30,7 +29,6 @@ const signatureFont = Great_Vibes({
   display: "swap",
 });
 
-// Helper to ensure all web links have absolute protocol for valid PDF clickable annotations
 const formatExternalUrl = (url?: string): string => {
   if (!url) return "#";
   const trimmed = url.trim();
@@ -44,10 +42,10 @@ function ResumeContent() {
   const { user } = useUser();
   const searchParams = useSearchParams();
 
-  // Read viewUser URL parameter for shareable link support
   const viewUserId = searchParams.get("viewUser");
   const targetUserId = viewUserId || user?.id;
 
+  const [isMounted, setIsMounted] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [passwordInput, setPasswordInput] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
@@ -62,7 +60,6 @@ function ResumeContent() {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Default Fallback Resume Data
   const defaultResume: ResumeData = {
     password: "1234",
     name: user?.fullName || "Portfolio Owner",
@@ -106,7 +103,23 @@ function ResumeContent() {
 
   const [resumeData, setResumeData] = useState<ResumeData>(defaultResume);
 
-  // Fetch resume data directly from Supabase (target shared user or logged-in user)
+  const formattedName = resumeData?.name || user?.fullName || "Portfolio Owner";
+  const nameParts = formattedName.split(" ");
+  const firstName = nameParts[0] || "";
+  const lastName = nameParts.slice(1).join(" ") || "";
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  // Proactively set the document title so browser save dialogs default to the actual name
+  useEffect(() => {
+    if (formattedName) {
+      const cleanName = formattedName.trim().replace(/[^a-zA-Z0-9_-]/g, "_");
+      document.title = `${cleanName}_Resume`;
+    }
+  }, [formattedName]);
+
   const loadResumeDataFromSupabase = useCallback(async () => {
     if (!targetUserId) {
       setIsLoading(false);
@@ -158,7 +171,6 @@ function ResumeContent() {
     }
   };
 
-  // Handle Access Request Submission
   const handleRequestSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (
@@ -175,7 +187,6 @@ function ResumeContent() {
 
     try {
       const activeTargetId = targetUserId || "default";
-
       let targetOwnerEmail = user?.primaryEmailAddress?.emailAddress;
 
       if (!targetOwnerEmail && resumeData?.email) {
@@ -210,29 +221,42 @@ function ResumeContent() {
     }
   };
 
-  const handlePrint = () => {
-    window.print();
+  const handleDownloadPdf = () => {
+    const cleanName = formattedName.trim().replace(/[^a-zA-Z0-9_-]/g, "_");
+    document.title = `${cleanName}_Resume`;
+
+    // 100ms buffer guarantees Chromium, Safari, and Firefox update their print spooler title
+    setTimeout(() => {
+      window.print();
+    }, 100);
   };
 
-  const formattedName = resumeData?.name || user?.fullName || "Portfolio Owner";
-  const nameParts = formattedName.split(" ");
-  const firstName = nameParts[0] || "";
-  const lastName = nameParts.slice(1).join(" ") || "";
+  if (!isMounted || isLoading) {
+    return <ResumeSkeleton />;
+  }
 
   return (
     <>
-      {/* Print CSS optimization to guarantee clickable links and proper coloring in downloaded PDF */}
       <style jsx global>{`
         @media print {
           @page {
             margin: 0;
-            size: auto;
+            size: A4 portrait;
+          }
+          header,
+          nav,
+          footer,
+          button,
+          .print\\:hidden {
+            display: none !important;
           }
           body {
-            background: white !important;
-            color: #1e293b !important;
+            background: #ffffff !important;
+            color: #0f172a !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
+            margin: 0 !important;
+            padding: 0 !important;
           }
           .printable-resume {
             box-shadow: none !important;
@@ -240,30 +264,37 @@ function ResumeContent() {
             border-radius: 0 !important;
             width: 100% !important;
             max-width: 100% !important;
+            position: static !important;
+            filter: none !important;
+            backdrop-filter: none !important;
           }
-          a {
-            text-decoration: none !important;
-            color: inherit !important;
+          a.clickable-pdf-link {
+            display: inline-block !important;
+            position: relative !important;
+            z-index: 9999 !important;
+            color: #1e293b !important;
+            text-decoration: underline !important;
             pointer-events: auto !important;
             cursor: pointer !important;
           }
         }
       `}</style>
 
-      {isLoading && <ResumeSkeleton />}
-
       <main className="min-h-screen pt-24 pb-10 px-4 flex flex-col items-center justify-center relative z-10">
-        <div className="w-full max-w-4xl flex justify-between items-center mb-6 print:hidden h-10">
+        <div className="w-full max-w-4xl flex justify-between items-center mb-6 h-10 print:hidden">
           <h1 className="text-xl font-bold dark:text-white">
             Interactive Resume
           </h1>
           <div>
             {isAuthenticated && (
               <button
-                onClick={handlePrint}
+                type="button"
+                onClick={handleDownloadPdf}
+                suppressHydrationWarning
                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-white text-white dark:text-slate-900 font-medium text-sm transition cursor-pointer shadow-md"
               >
-                <Printer size={16} /> Print / Save PDF
+                <Download size={16} />
+                <span>Download / Save as PDF</span>
               </button>
             )}
           </div>
@@ -281,8 +312,7 @@ function ResumeContent() {
                     <h2 className="text-xl font-bold">Request Sent!</h2>
                     <p className="text-xs text-slate-400 leading-relaxed">
                       Your request and contact details have been emailed
-                      directly to the profile owner. They will review your
-                      message and reach out to you if interested.
+                      directly to the profile owner.
                     </p>
                   </div>
                 ) : mode === "password" ? (
@@ -302,6 +332,8 @@ function ResumeContent() {
                       placeholder="Enter password..."
                       value={passwordInput}
                       onChange={(e) => setPasswordInput(e.target.value)}
+                      suppressHydrationWarning
+                      autoComplete="current-password"
                       className="w-full p-3 border rounded-xl text-sm bg-slate-800/90 border-slate-700 text-white placeholder-slate-500 focus:outline-indigo-500"
                     />
 
@@ -313,6 +345,7 @@ function ResumeContent() {
 
                     <button
                       type="submit"
+                      suppressHydrationWarning
                       className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl text-sm transition flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-indigo-600/30"
                     >
                       <Unlock size={16} /> Unlock Resume
@@ -320,13 +353,14 @@ function ResumeContent() {
 
                     <button
                       type="button"
+                      suppressHydrationWarning
                       onClick={() => {
                         setMode("request");
                         setErrorMsg("");
                       }}
                       className="text-xs text-indigo-400 hover:text-indigo-300 underline cursor-pointer pt-2 block mx-auto"
                     >
-                      Don't have a password? Request Access
+                      {"Don't have a password? Request Access"}
                     </button>
                   </form>
                 ) : (
@@ -351,6 +385,7 @@ function ResumeContent() {
                         placeholder="e.g. John Doe"
                         value={visitorName}
                         onChange={(e) => setVisitorName(e.target.value)}
+                        suppressHydrationWarning
                         className="w-full p-2.5 border rounded-xl text-xs bg-slate-800/90 border-slate-700 text-white placeholder-slate-500 focus:outline-indigo-500"
                       />
                     </div>
@@ -364,6 +399,7 @@ function ResumeContent() {
                         placeholder="e.g. Hiring for Software Engineer role..."
                         value={requestReason}
                         onChange={(e) => setReason(e.target.value)}
+                        suppressHydrationWarning
                         className="w-full p-2.5 border rounded-xl text-xs bg-slate-800/90 border-slate-700 text-white placeholder-slate-500 focus:outline-indigo-500 resize-none"
                       />
                     </div>
@@ -377,6 +413,7 @@ function ResumeContent() {
                         placeholder="e.g. +1 234 567 8900"
                         value={visitorContact}
                         onChange={(e) => setVisitorContact(e.target.value)}
+                        suppressHydrationWarning
                         className="w-full p-2.5 border rounded-xl text-xs bg-slate-800/90 border-slate-700 text-white placeholder-slate-500 focus:outline-indigo-500"
                       />
                     </div>
@@ -390,6 +427,7 @@ function ResumeContent() {
                     <button
                       type="submit"
                       disabled={isSubmitting}
+                      suppressHydrationWarning
                       className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl text-xs transition flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-indigo-600/30 disabled:opacity-50"
                     >
                       <Send size={14} />
@@ -400,6 +438,7 @@ function ResumeContent() {
 
                     <button
                       type="button"
+                      suppressHydrationWarning
                       onClick={() => {
                         setMode("password");
                         setErrorMsg("");
@@ -417,10 +456,11 @@ function ResumeContent() {
           <div
             className={`grid grid-cols-1 md:grid-cols-12 min-h-[1000px] ${
               !isAuthenticated
-                ? "filter blur-md select-none pointer-events-none"
+                ? "filter blur-md select-none pointer-events-none print:filter-none print:pointer-events-auto"
                 : ""
             }`}
           >
+            {/* Left Column */}
             <div className="md:col-span-5 bg-[#f3e5e3] p-8 flex flex-col gap-8 border-r border-slate-200/50">
               {resumeData?.photoUrl && (
                 <div className="p-3 bg-white shadow-md rounded-xl inline-block mx-auto">
@@ -451,23 +491,29 @@ function ResumeContent() {
                 </h3>
                 <div className="space-y-2.5 text-xs text-slate-700 px-1">
                   {resumeData?.phone && (
-                    <a
-                      href={`tel:${resumeData.phone.replace(/\s+/g, "")}`}
-                      className="flex items-center gap-3 hover:text-[#a87068] transition print:text-slate-800"
-                    >
+                    <div className="flex items-center gap-3">
                       <Phone size={14} className="text-[#a87068] shrink-0" />
-                      <span>{resumeData.phone}</span>
-                    </a>
+                      <a
+                        href={`tel:${resumeData.phone.replace(/\s+/g, "")}`}
+                        className="clickable-pdf-link hover:text-[#a87068] transition"
+                      >
+                        {resumeData.phone}
+                      </a>
+                    </div>
                   )}
+
                   {resumeData?.email && (
-                    <a
-                      href={`mailto:${resumeData.email.trim()}`}
-                      className="flex items-center gap-3 hover:text-[#a87068] transition print:text-slate-800"
-                    >
+                    <div className="flex items-center gap-3">
                       <Mail size={14} className="text-[#a87068] shrink-0" />
-                      <span>{resumeData.email}</span>
-                    </a>
+                      <a
+                        href={`mailto:${resumeData.email.trim()}`}
+                        className="clickable-pdf-link hover:text-[#a87068] transition"
+                      >
+                        {resumeData.email}
+                      </a>
+                    </div>
                   )}
+
                   {resumeData?.address && (
                     <p className="flex items-center gap-3">
                       <MapPin size={14} className="text-[#a87068] shrink-0" />
@@ -476,26 +522,26 @@ function ResumeContent() {
                   )}
 
                   {resumeData?.socials && resumeData.socials.length > 0 && (
-                    <div className="pt-2 border-t border-[#e2cac7] space-y-2">
+                    <div className="pt-2 border-t border-[#e2cac7] space-y-2.5">
                       {resumeData.socials.map((social) => {
-                        const href = formatExternalUrl(social.url);
+                        const cleanHref = formatExternalUrl(social.url);
                         return (
-                          <a
-                            key={social.id}
-                            href={href}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center justify-between hover:text-[#a87068] transition font-medium text-slate-700 print:text-slate-800 print:underline"
-                          >
+                          <div key={social.id} className="flex items-center">
                             <span className="flex items-center gap-2">
-                              <Globe size={13} className="text-[#a87068]" />
-                              {social.platform || "Social Link"}
+                              <Globe
+                                size={14}
+                                className="text-[#a87068] shrink-0"
+                              />
+                              <a
+                                href={cleanHref}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="clickable-pdf-link font-semibold hover:text-[#a87068] transition"
+                              >
+                                {social.platform || "Website"}
+                              </a>
                             </span>
-                            <ExternalLink
-                              size={11}
-                              className="opacity-60 print:hidden"
-                            />
-                          </a>
+                          </div>
                         );
                       })}
                     </div>
@@ -530,6 +576,7 @@ function ResumeContent() {
               )}
             </div>
 
+            {/* Right Column */}
             <div className="md:col-span-7 p-10 bg-white flex flex-col gap-8 justify-between">
               <div className="space-y-1 pt-4">
                 <h1

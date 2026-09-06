@@ -11,6 +11,8 @@ import {
   HeartHandshake,
   Check,
   Share2,
+  GraduationCap,
+  Sparkles,
 } from "lucide-react";
 import { Great_Vibes } from "next/font/google";
 import { useProfile } from "./layout";
@@ -33,7 +35,6 @@ function HomeContent() {
   const { user } = useUser();
   const searchParams = useSearchParams();
 
-  // Read URL parameters for view mode
   const searchedUserFromUrl = searchParams.get("user");
   const viewUserId = searchParams.get("viewUser");
   const targetUserId = viewUserId || user?.id;
@@ -48,6 +49,28 @@ function HomeContent() {
   const [likeCount, setLikeCount] = useState(0);
   const [hasLiked, setHasLiked] = useState(false);
 
+  // CGPA State & Animation
+  const [totalCgpa, setTotalCgpa] = useState("8.85");
+  const [semesters, setSemesters] = useState<
+    Array<{ label: string; score: string }>
+  >([
+    { label: "Sem 1", score: "8.60" },
+    { label: "Sem 2", score: "8.80" },
+    { label: "Sem 3", score: "9.10" },
+  ]);
+  const [currentSemIndex, setCurrentSemIndex] = useState(0);
+
+  // 2.5s interval is the natural reading pace for animated metrics
+  useEffect(() => {
+    if (semesters.length <= 1) return;
+
+    const interval = setInterval(() => {
+      setCurrentSemIndex((prev) => (prev + 1) % semesters.length);
+    }, 2500);
+
+    return () => clearInterval(interval);
+  }, [semesters]);
+
   // Fetch Profile & Stats from Supabase cleanly
   const fetchPageProfile = useCallback(async () => {
     if (!targetUserId) {
@@ -59,7 +82,7 @@ function HomeContent() {
       const { data, error } = await supabase
         .from("profiles")
         .select(
-          "name, role, bio, signature, profile_img, follower_count, following_count, like_count",
+          "name, role, bio, signature, profile_img, follower_count, following_count, like_count, total_cgpa, semester_grades",
         )
         .eq("user_id", targetUserId)
         .single();
@@ -80,23 +103,37 @@ function HomeContent() {
         if (typeof data.following_count === "number")
           setFollowingCount(data.following_count);
         if (typeof data.like_count === "number") setLikeCount(data.like_count);
+
+        if (data.total_cgpa) setTotalCgpa(data.total_cgpa);
+        if (
+          data.semester_grades &&
+          Array.isArray(data.semester_grades) &&
+          data.semester_grades.length > 0
+        ) {
+          setSemesters(data.semester_grades);
+          setCurrentSemIndex(0);
+        }
       }
     } catch (e) {
       console.error("Failed to load profile from database", e);
     } finally {
       setIsLoading(false);
     }
-  }, [targetUserId]);
+  }, [targetUserId, profileContext]);
 
   useEffect(() => {
     fetchPageProfile();
 
-    window.addEventListener("profile-updated", fetchPageProfile);
+    // Auto-refresh data and reset cycle whenever changes are saved
+    const handleProfileUpdate = () => {
+      fetchPageProfile();
+    };
+
+    window.addEventListener("profile-updated", handleProfileUpdate);
     return () =>
-      window.removeEventListener("profile-updated", fetchPageProfile);
+      window.removeEventListener("profile-updated", handleProfileUpdate);
   }, [fetchPageProfile]);
 
-  // Public Follow Handler
   const handleFollowToggle = async () => {
     if (!targetUserId) return;
 
@@ -109,23 +146,18 @@ function HomeContent() {
     setFollowerCount(nextFollowerCount);
 
     try {
-      const { error } = await supabase
+      await supabase
         .from("profiles")
         .update({
           follower_count: nextFollowerCount,
           updated_at: new Date().toISOString(),
         })
         .eq("user_id", targetUserId);
-
-      if (error) {
-        console.error("Failed to sync follower count:", error.message);
-      }
     } catch (err) {
       console.error("Follow sync error:", err);
     }
   };
 
-  // Public Profile Like Handler
   const handleProfileLikeToggle = async () => {
     if (!targetUserId) return;
 
@@ -138,23 +170,18 @@ function HomeContent() {
     setLikeCount(nextLikeCount);
 
     try {
-      const { error } = await supabase
+      await supabase
         .from("profiles")
         .update({
           like_count: nextLikeCount,
           updated_at: new Date().toISOString(),
         })
         .eq("user_id", targetUserId);
-
-      if (error) {
-        console.error("Failed to sync profile like count:", error.message);
-      }
     } catch (err) {
       console.error("Profile like sync error:", err);
     }
   };
 
-  // Copy Direct Share Link
   const handleCopyShareLink = () => {
     if (typeof window !== "undefined") {
       const currentHost = window.location.origin;
@@ -169,7 +196,6 @@ function HomeContent() {
     }
   };
 
-  // Dynamic Fallbacks
   const activeUserQuery = searchedUserFromUrl;
   const fallbackName = user?.fullName || "Portfolio Owner";
   const fallbackSignature = user?.firstName || "Signature";
@@ -202,7 +228,7 @@ function HomeContent() {
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
                     <p className="text-xl sm:text-2xl font-medium text-slate-600 dark:text-slate-400">
-                      Hi, I'm
+                      Hi, I&apos;m
                     </p>
 
                     {!isViewingGuest && (
@@ -232,10 +258,62 @@ function HomeContent() {
                     {activeName}
                   </h1>
 
+                  {/* DOMAIN / ROLE */}
                   <h2 className="text-2xl sm:text-3xl font-light text-slate-600 dark:text-slate-300 pt-2">
                     {profileContext?.role ||
                       "Developer & Designer crafting modern digital experiences."}
                   </h2>
+
+                  {/* SOLID HORIZONTAL DIVIDER BAR BELOW DOMAIN */}
+                  <div className="w-full h-[2.5px] bg-slate-400/40 dark:bg-slate-700 my-4 rounded-full" />
+
+                  {/* CGPA METRICS ROW */}
+                  <div className="flex items-center justify-between px-4 py-3 rounded-2xl bg-white/80 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 shadow-sm backdrop-blur-xs">
+                    {/* Left: Overall Total CGPA */}
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-200/40 dark:border-sky-500/20">
+                        <GraduationCap size={20} />
+                      </div>
+                      <div>
+                        <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400 dark:text-slate-500 block leading-tight">
+                          Cumulative CGPA
+                        </span>
+                        <div className="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-baseline gap-1">
+                          <span>{totalCgpa}</span>
+                          <span className="text-xs font-semibold text-slate-400">
+                            / 10.0
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right: Semester Animated Carousel */}
+                    {semesters.length > 0 && (
+                      <div className="flex flex-col items-end">
+                        <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400 dark:text-slate-500 flex items-center gap-1 leading-tight">
+                          <Sparkles
+                            size={11}
+                            className="text-amber-500 animate-pulse"
+                          />
+                          Academic Track
+                        </span>
+
+                        <div className="h-7 overflow-hidden flex items-center mt-0.5">
+                          <div
+                            key={currentSemIndex}
+                            className="flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-500 fill-mode-both"
+                          >
+                            <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200/50 dark:border-indigo-800/50">
+                              {semesters[currentSemIndex]?.label}
+                            </span>
+                            <span className="text-base font-black text-indigo-600 dark:text-indigo-400">
+                              {semesters[currentSemIndex]?.score}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="pt-2 border-t border-slate-300/40 dark:border-slate-800 space-y-2">

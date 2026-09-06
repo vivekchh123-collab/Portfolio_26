@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Upload, AtSign } from "lucide-react";
+import { X, Upload, AtSign, GraduationCap } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { useProfile } from "@/app/layout";
 import { supabase } from "@/lib/supabaseClient";
@@ -30,25 +30,38 @@ export default function HomeEditorModal({
   } = useProfile();
 
   const [modalUsername, setModalUsername] = useState("");
+  const [totalCgpaInput, setTotalCgpaInput] = useState("8.85");
+  const [semesterGradesInput, setSemesterGradesInput] = useState(
+    "Sem 1: 8.60, Sem 2: 8.80, Sem 3: 9.10",
+  );
   const [isSaving, setIsSaving] = useState(false);
 
-  // Fetch saved username directly from Supabase when modal opens
   useEffect(() => {
     let isMounted = true;
 
     if (isOpen && user?.id) {
-      async function loadUsername() {
+      async function loadProfileData() {
         try {
           const { data, error } = await supabase
             .from("profiles")
-            .select("username")
+            .select("username, total_cgpa, semester_grades")
             .eq("user_id", user?.id)
             .single();
 
-          if (isMounted) {
-            if (data?.username && !error) {
-              setModalUsername(data.username);
-            } else if (user?.username) {
+          if (isMounted && data && !error) {
+            if (data.username) setModalUsername(data.username);
+            if (data.total_cgpa) setTotalCgpaInput(data.total_cgpa);
+            if (data.semester_grades && Array.isArray(data.semester_grades)) {
+              const formatted = data.semester_grades
+                .map(
+                  (g: { label: string; score: string }) =>
+                    `${g.label}: ${g.score}`,
+                )
+                .join(", ");
+              setSemesterGradesInput(formatted);
+            }
+          } else if (isMounted) {
+            if (user?.username) {
               setModalUsername(user.username);
             } else if (user?.fullName) {
               setModalUsername(
@@ -57,11 +70,11 @@ export default function HomeEditorModal({
             }
           }
         } catch (err) {
-          console.error("Failed to fetch username from Supabase", err);
+          console.error("Failed to fetch profile details from Supabase", err);
         }
       }
 
-      loadUsername();
+      loadProfileData();
     }
 
     return () => {
@@ -69,12 +82,9 @@ export default function HomeEditorModal({
     };
   }, [isOpen, user]);
 
-  // Modal Escape key and scroll lock
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose();
-      }
+      if (e.key === "Escape") onClose();
     };
 
     if (isOpen) {
@@ -92,7 +102,6 @@ export default function HomeEditorModal({
 
   if (!isOpen) return null;
 
-  // Compress large uploaded images
   const compressImage = (
     file: File,
     maxWidth = 800,
@@ -155,6 +164,14 @@ export default function HomeEditorModal({
     const userEmail = user.primaryEmailAddress?.emailAddress;
     const cleanUsername = modalUsername.trim().replace(/^@+/, "");
 
+    const parsedSemesters = semesterGradesInput
+      .split(",")
+      .map((item) => {
+        const [label, score] = item.split(":").map((s) => s?.trim());
+        return label && score ? { label, score } : null;
+      })
+      .filter(Boolean);
+
     try {
       const { error } = await supabase.from("profiles").upsert(
         {
@@ -166,6 +183,8 @@ export default function HomeEditorModal({
           bio,
           signature,
           profile_img: profileImg,
+          total_cgpa: totalCgpaInput.trim(),
+          semester_grades: parsedSemesters,
           updated_at: new Date().toISOString(),
         },
         { onConflict: "user_id" },
@@ -175,6 +194,7 @@ export default function HomeEditorModal({
         console.error("Supabase Save Error:", error.message);
         alert("Failed to save changes to database.");
       } else {
+        // Dispatches event to trigger immediate re-fetch on the home page
         window.dispatchEvent(new Event("profile-updated"));
         onClose();
       }
@@ -207,7 +227,6 @@ export default function HomeEditorModal({
         </h2>
 
         <div className="space-y-3">
-          {/* USERNAME FIELD */}
           <div>
             <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">
               <AtSign size={13} className="text-indigo-500" /> Username / Handle
@@ -219,6 +238,43 @@ export default function HomeEditorModal({
               placeholder="e.g. your_username"
               className="w-full mt-1 p-2.5 border rounded-lg text-sm bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 font-mono"
             />
+          </div>
+
+          {/* ACADEMIC CGPA SETTINGS */}
+          <div className="p-3 bg-sky-50 dark:bg-slate-800/60 rounded-xl border border-sky-100 dark:border-slate-700 space-y-2.5">
+            <label className="text-xs font-bold text-sky-700 dark:text-sky-300 flex items-center gap-1">
+              <GraduationCap size={15} /> Academic CGPA & Semester Scores
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="col-span-1">
+                <span className="text-[10px] text-slate-400 uppercase font-semibold">
+                  Total CGPA
+                </span>
+                <input
+                  type="text"
+                  value={totalCgpaInput}
+                  onChange={(e) => setTotalCgpaInput(e.target.value)}
+                  placeholder="8.85"
+                  className="w-full mt-0.5 p-2 border rounded-lg text-xs bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 font-bold"
+                />
+              </div>
+              <div className="col-span-2">
+                <span className="text-[10px] text-slate-400 uppercase font-semibold">
+                  Semesters (Comma separated)
+                </span>
+                <input
+                  type="text"
+                  value={semesterGradesInput}
+                  onChange={(e) => setSemesterGradesInput(e.target.value)}
+                  placeholder="Sem 1: 8.5, Sem 2: 8.9"
+                  className="w-full mt-0.5 p-2 border rounded-lg text-xs bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700"
+                />
+              </div>
+            </div>
+            <p className="text-[10px] text-slate-400 dark:text-slate-500">
+              Format:{" "}
+              <span className="font-mono">Sem 1: 8.60, Sem 2: 8.80</span>
+            </p>
           </div>
 
           <div>
@@ -257,7 +313,6 @@ export default function HomeEditorModal({
             />
           </div>
 
-          {/* EDIT SIGNATURE */}
           <div>
             <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">
               Auto-Signature Text
